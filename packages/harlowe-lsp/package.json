@@ -1,0 +1,21 @@
+{
+  "name": "@twee-grind/harlowe-lsp",
+  "version": "0.1.0",
+  "description": "Harlowe language server protocol implementation",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "harlowe",
+    "lsp",
+    "language-server"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.12"
+  }
+}

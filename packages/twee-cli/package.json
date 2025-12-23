@@ -1,0 +1,26 @@
+{
+  "name": "@twee-grind/twee-cli",
+  "version": "0.1.0",
+  "description": "CLI tool for Twee/Twine operations",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "twee": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "twee",
+    "cli",
+    "twine"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^14.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.3"
+  }
+}
