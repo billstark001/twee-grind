@@ -1,0 +1,13 @@
+{
+  "name": "@twee-grind/twee-project",
+  "version": "0.1.0",
+  "description": "Twee 3 project parser with Passage and Story types",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "keywords": ["twee", "parser", "twine"],
+  "license": "MIT"
+}

@@ -1,0 +1,24 @@
+{
+  "name": "@twee-grind/harlowe-markup",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Harlowe markup lexer and parser",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "rollup -c",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "harlowe",
+    "lexer",
+    "parser"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@rollup/plugin-node-resolve": "^16.0.3",
+    "@rollup/plugin-typescript": "^12.3.0",
+    "rollup": "^4.54.0",
+    "tslib": "^2.8.1"
+  }
+}
