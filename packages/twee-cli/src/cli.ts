@@ -18,11 +18,11 @@ program
   .command('extract <html-file>')
   .description('Extract tw-storydata and tw-passagedata from HTML file')
   .option('-o, --output <dir>', 'Output directory', '.')
-  .action(async (htmlFile: string, options: { output: string }) => {
+  .action((htmlFile: string, options: { output: string }) => {
     try {
       const htmlPath = path.resolve(htmlFile);
       const outputDir = path.resolve(options.output);
-      await extractor.extractFromFile(htmlPath, outputDir);
+      extractor.extractFromFile(htmlPath, outputDir);
     } catch (error) {
       console.error('Error:', error instanceof Error ? error.message : error);
       process.exit(1);

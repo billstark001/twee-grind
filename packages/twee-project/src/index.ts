@@ -25,7 +25,6 @@ export class TweeParser {
    */
   parse(content: string): Passage[] {
     const passages: Passage[] = [];
-    const passageRegex = /^::(.+?)(?:\[(.+?)\])?(?:\s*<(.+?)>)?$/gm;
     const lines = content.split('\n');
     
     let currentPassage: Passage | null = null;

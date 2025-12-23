@@ -112,7 +112,7 @@ export class HTMLExtractor {
   /**
    * Extract and save from HTML file
    */
-  async extractFromFile(htmlPath: string, outputDir: string = '.'): Promise<void> {
+  extractFromFile(htmlPath: string, outputDir: string = '.'): void {
     const html = fs.readFileSync(htmlPath, 'utf-8');
     const storyData = this.extractStoryData(html);
     const passages = this.extractPassages(html);
