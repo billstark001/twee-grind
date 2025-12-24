@@ -5,6 +5,7 @@
 
 import { Command } from 'commander';
 import { extractor } from './extractor';
+import { harlowe } from './harlowe';
 import * as path from 'path';
 
 const program = new Command();
@@ -27,6 +28,13 @@ program
       console.error('Error:', error instanceof Error ? error.message : error);
       process.exit(1);
     }
+  });
+
+program
+  .command('harlowe [file]')
+  .description('Analyze Harlowe markup code from file or stdin')
+  .action((file?: string) => {
+    harlowe.analyze(file);
   });
 
 program.parse();
