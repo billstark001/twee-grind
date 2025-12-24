@@ -23,16 +23,11 @@ export const harlowe = {
         code = fs.readFileSync(0, 'utf-8');
       }
 
-      // Call TokenWalker.walk to analyze and output results
-      const walker = new TokenWalker(code);
+      const walker = new TokenWalker(code, ['macro']);
       let layer = 0;
-      let ignoreUntilLayer = -1;
       for (const { node, entering } of walker) {
         if (!entering) {
           --layer;
-          if (layer < ignoreUntilLayer) {
-            ignoreUntilLayer = -1;
-          }
           continue;
         }
         const pad = ' '.repeat(layer);
@@ -59,8 +54,6 @@ export const harlowe = {
           const paddedText = rawText
             .replace(/\n/g, '\n' + pad);
           console.log(pad + paddedText);
-          ignoreUntilLayer = layer;
-          // ++layer;
         }
 
         ++layer;

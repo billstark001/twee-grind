@@ -16,6 +16,7 @@ export class TokenWalker {
    */
   private readonly _nodes: [AnyToken, number][];
   private _firstStep: boolean;
+  private _skipChildren?: Set<string>;
 
   private get currentNodeInner(): [AnyToken | undefined, number] {
     if (this._nodes.length === 0)
@@ -32,10 +33,11 @@ export class TokenWalker {
   }
 
 
-  constructor(rootNode: string | AnyToken) {
+  constructor(rootNode: string | AnyToken, skipChildren?: Iterable<string>) {
     this.rootNode = typeof rootNode === 'string' ? (Lexer.lex(rootNode) as AnyToken) : rootNode;
     this._nodes = [];
     this._firstStep = false;
+    this._skipChildren = skipChildren ? new Set(skipChildren) : undefined;
     this.reset();
   }
 
@@ -64,7 +66,11 @@ export class TokenWalker {
       // we have already reached the end
       return undefined;
     }
-    if (cur.children !== undefined && cur.children.length > 0) {
+    if (
+      cur.children !== undefined
+      && cur.children.length > 0
+      && (this._skipChildren === undefined || !this._skipChildren.has(cur.type))
+    ) {
       // cur has children
       if (ind < cur.children.length) {
         // cur has looked for its partial children

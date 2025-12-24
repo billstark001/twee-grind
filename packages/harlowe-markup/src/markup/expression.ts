@@ -323,7 +323,7 @@ export function parse(tokens: AnyToken[]): ASTNode | undefined {
           current = current.left;
         }
         if (current) {
-          args.push(current);
+          args.unshift(current);
         }
       } else {
         args.push(rawArgs);
