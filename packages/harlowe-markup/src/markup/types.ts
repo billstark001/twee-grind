@@ -1,5 +1,7 @@
-import {Token} from './lexer.js'
-import {ArrayValues} from 'type-fest'
+import type { Token } from './lexer.js'
+import { ArrayValues } from 'type-fest'
+
+// #region token types
 
 /*
 	Every token created by Harlowe markup. These provide more effective type-narrowing than just Token.
@@ -39,8 +41,8 @@ export type ColumnToken = Token & {
 }
 export type TwineLinkToken = Token & {
 	type: `twineLink`
-	innerText?:string
-	passage:string
+	innerText?: string
+	passage: string
 }
 export type HookToken = Token & {
 	type: `hook` | `unclosedHook`
@@ -112,13 +114,13 @@ export type IncludeToken = Token & {
 	name: string
 }
 export const plainKeywords = Object.freeze([`boolean`, `is`, `to`, `into`, `where`, `when`, `via`, `making`, `each`, `and`, `or`, `not`,
-`isNot`, `contains`, `doesNotContain`, `isIn`, `isA`, `isNotA`, `isNotIn`, `matches`, `doesNotMatch`, `typifies`, `untypifies`, `bind`] as const)
+	`isNot`, `contains`, `doesNotContain`, `isIn`, `isA`, `isNotA`, `isNotIn`, `matches`, `doesNotMatch`, `typifies`, `untypifies`, `bind`] as const)
 export const plainOperators = Object.freeze([`comma`, `spread`, `typeSignature`, `addition`, `subtraction`, `multiplication`, `division`] as const)
 
 export type OtherToken = Token & {
 	type: `root` | `text` | `whitespace` | `hr` | `br` | `sub` | `sup` | `strong` | `em` | `bold` | `italic` | `strike` | `twine1Macro` | `scriptStyleTag` | `url` | `verbatim${number}` | `collapsed` | `unclosedCollapsed` | `escapedLine` | `legacyLink`
-		| `inlineUrl` | `macroName` | `possessiveOperator` | `itsOperator` | `belongingItOperator` | `belongingOperator` | `htmlComment` | `string` | `positive` | `negative` | `grouping` | `comment`
-		| ArrayValues<typeof plainKeywords> | ArrayValues<typeof plainOperators>
+	| `inlineUrl` | `macroName` | `possessiveOperator` | `itsOperator` | `belongingItOperator` | `belongingOperator` | `htmlComment` | `string` | `positive` | `negative` | `grouping` | `comment`
+	| ArrayValues<typeof plainKeywords> | ArrayValues<typeof plainOperators>
 }
 
 /*
@@ -139,3 +141,126 @@ export type IncompleteTokenType = TokenType | `emBack` | `emFront` | `strongBack
 export type IncompleteToken = Partial<AnyToken | (Token & {
 	type: IncompleteTokenType
 })>
+
+// #endregion
+
+
+// #region syntax tree types
+
+// Root AST node - represents top-level content structure
+export type HarloweASTNode =
+	TextFlowNode | LinkNode | ExpressionNode
+
+// Expression nodes - represents executable code and values
+export type ExpressionNode =
+	OperatorNode | LiteralNode | VariableNode | RawVariableNode | MacroNode | CodeHookNode
+
+// Valid children inside code hooks (named hooks like [text]<name|)
+export type CodeHookChildNode =
+	TextFlowNode | CodeHookNode | LinkNode | MacroNode | VariableNode
+
+// Code hook - named or unnamed block with optional visibility control
+export interface CodeHookNode {
+	type: 'codeHook'
+	storyletMetadata?: Record<string, any>
+	name?: string
+	initiallyHidden?: boolean // starts with | instead of [
+	unclosed?: boolean
+	children: CodeHookChildNode[]
+}
+
+// Valid children in text flow (narrative content)
+export type TextFlowChildNode =
+	| TextNode
+	| FormattedTextNode
+	| LineBreakNode
+	| HorizontalRuleNode
+
+// Text flow - continuous narrative content
+export interface TextFlowNode {
+	type: 'textFlow'
+	children: TextFlowChildNode[]
+}
+
+// Plain text node
+export interface TextNode {
+	type: 'text'
+	content: string
+}
+
+// Formatted text with style (bold, italic, etc.)
+export interface FormattedTextNode {
+	type: 'formatted'
+	style: string
+	children: (TextNode | FormattedTextNode)[]
+}
+
+// Line break
+export interface LineBreakNode {
+	type: 'lineBreak'
+}
+
+// Horizontal rule/divider
+export interface HorizontalRuleNode {
+	type: 'horizontalRule'
+}
+
+// Passage link [[text->passage]]
+export interface LinkNode {
+	type: 'link'
+	text: string
+	passage: string
+}
+
+// Macro metadata (name and arguments)
+export interface MacroMetadata {
+	name: string
+	args: ExpressionNode[]
+}
+
+// Macro invocation with optional chaining and attached hook
+export interface MacroNode extends MacroMetadata {
+	type: 'macro'
+	chainedMacros?: MacroMetadata[] // (set:)(if:) chains
+	attachedHook?: CodeHookNode // (if: $x)[text]
+}
+
+// Story/temp variable reference
+export interface VariableNode {
+	type: 'variable'
+	name: string
+	isTemp?: boolean // _temp vs $story
+}
+
+// Raw identifier (reserved words, properties)
+export interface RawVariableNode {
+	type: 'rawVariable'
+	name: string // reserved words (num, ...), property accessor (1stto4th, ...), etc.
+}
+
+// Operator nodes (unary/binary operations)
+export type OperatorNode = UnaryOperatorNode | BinaryOperatorNode
+
+// Unary operator (prefix/postfix)
+export interface UnaryOperatorNode {
+	type: 'prefix' | 'postfix'
+	operator: string
+	operand: ExpressionNode
+}
+
+// Binary operator (infix)
+export interface BinaryOperatorNode {
+	type: 'binary'
+	operator: string
+	left: ExpressionNode
+	right: ExpressionNode
+}
+
+// Literal value (number, string, etc.)
+export interface LiteralNode {
+	type: 'literal'
+	dataType: string
+	value: any
+}
+
+// #endregion

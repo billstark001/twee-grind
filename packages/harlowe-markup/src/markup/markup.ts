@@ -6,7 +6,7 @@ import Patterns from './patterns.js'
 import {Lexer,Token,Rule} from './lexer.js'
 import {SetReturnType} from 'type-fest'
 import {IncompleteTokenType,IncompleteToken,AnyToken,TokenType,plainKeywords,plainOperators} from './types.js'
-import { parse } from './expression.js'
+import {Parser} from './parser.js'
 
 // A basic type utility.
 // Because this file is used by both TwineMarkup and Harlowe,
@@ -859,7 +859,7 @@ export let Markup = Object.freeze({
 		to use the Harlowe-specific token types.
 	*/
 	lex: <SetReturnType<typeof Lexer.lex, AnyToken>>rules(Lexer).lex,
-	parse: parse,
+	parse: Parser.parse,
 	/*
 		The Patterns are exported for use by consumers in understanding
 		the specifics of Harlowe's markup language.

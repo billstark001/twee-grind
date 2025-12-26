@@ -33,8 +33,9 @@ program
 program
   .command('harlowe [file]')
   .description('Analyze Harlowe markup code from file or stdin')
-  .action((file?: string) => {
-    harlowe.analyze(file);
+  .option('--ast', 'Display AST structure instead of tokens')
+  .action((file?: string, options?: { ast?: boolean }) => {
+    harlowe.analyze(file, options?.ast ? 'ast' : 'tokens');
   });
 
 program.parse();

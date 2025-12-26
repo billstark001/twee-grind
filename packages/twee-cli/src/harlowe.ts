@@ -2,7 +2,7 @@
  * Harlowe markup analysis command
  */
 
-import { TokenWalker, Markup } from '@twee-grind/harlowe-markup';
+import { TokenWalker, Markup, traverseAST } from '@twee-grind/harlowe-markup';
 import * as fs from 'fs';
 
 const DISP_LENGTH = 128;
@@ -11,7 +11,7 @@ export const harlowe = {
   /**
    * Analyze Harlowe code from a file or stdin
    */
-  analyze(file?: string) {
+  analyze(file?: string, mode: 'tokens' | 'ast' = 'tokens') {
     try {
       let code: string;
 
@@ -23,7 +23,33 @@ export const harlowe = {
         code = fs.readFileSync(0, 'utf-8');
       }
 
-      const walker = new TokenWalker(code, ['macro']);
+      const rootToken = Markup.lex(code);
+
+      if (mode === 'ast') {
+        const rootNode = Markup.parse(rootToken);
+        // Display parsed AST structure
+        let astLayer = 1;
+        for (const event of traverseAST(rootNode)) {
+          if (!event.entering) {
+            --astLayer;
+            continue;
+          }
+          const astPad = '  '.repeat(astLayer);
+          const {
+            type, left, right,
+            operand, chainedMacros, attachedHook, children, args,
+            ...nodeData
+          } = event.node as any;
+          const nodeInfo = Object.keys(nodeData).length > 0
+            ? JSON.stringify(nodeData)
+            : '';
+          console.log(`${astPad}[${type}] ${nodeInfo}`);
+          ++astLayer;
+        }
+        return;
+      }
+
+      const walker = new TokenWalker(rootToken);
       let layer = 0;
       for (const { node, entering } of walker) {
         if (!entering) {
@@ -47,20 +73,12 @@ export const harlowe = {
           : textDisplay
         ));
 
-
-        if (node.type === 'macro') {
-          const parsedMacro = Markup.parse([node]);
-          const rawText = JSON.stringify(parsedMacro, null, 2);
-          const paddedText = rawText
-            .replace(/\n/g, '\n' + pad);
-          console.log(pad + paddedText);
-        }
-
         ++layer;
       }
 
     } catch (error) {
       console.error('Error:', error instanceof Error ? error.message : error);
+      console.error('Stack trace:', error instanceof Error ? error.stack : '');
       process.exit(1);
     }
   }

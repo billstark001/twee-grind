@@ -1,7 +1,9 @@
 
 
-import { ASTNode, PrattParser, PrattToken, type OperatorConfig } from '../utils/pratt-parser';
-import { AnyToken, MacroToken } from './types';
+import { BinaryNode, LeafNode, PrattASTNode, PrattExprToken, PrattParser, PrattToken, type OperatorConfig } from '../utils/pratt-parser'
+import { AnyToken, MacroToken } from './types'
+
+// #region token & precedence definitions
 
 export const allExpressionTokens = Object.freeze([
   'is',
@@ -29,12 +31,12 @@ export const allExpressionTokens = Object.freeze([
 
   'spread', // ...
   'comma', // ,
-  'typeSignature', // a-type
+  'typeSignature', // a-type b
 
   'to', // (set: $a to 5)
   'into', // (put: 5 into $a)
   'via', // (link: "text" via "passage")
-  'where', // _num where _num > 5; where it > 5
+  'where', // _num where _num > 5 where it > 5
   'when', // when a > b
   'making', // _num making _total via _total + _num
   'each', // each _item
@@ -45,9 +47,9 @@ export const allExpressionTokens = Object.freeze([
 
   'itsOperator', // its b
   'belongingItOperator', // b of it
-] as const);
+] as const)
 
-const _allExpressionTokensSet = new Set<string>(allExpressionTokens);
+const _allExpressionTokensSet = new Set<string>(allExpressionTokens)
 
 export const extendedExpressionTokens = Object.freeze([
   'modulus', // a % b
@@ -56,11 +58,15 @@ export const extendedExpressionTokens = Object.freeze([
   'le',    // a <= b
   'gt',     // a > b
   'lt',     // a < b
-] as const);
+] as const)
 
-export type ExpressionTokenType = typeof allExpressionTokens[number];
+export type ExpressionTokenType = typeof allExpressionTokens[number]
 
-export const harloweOperatorConfigs: Record<ExpressionTokenType, OperatorConfig> = {
+export type ExtendedExpressionTokenType = typeof extendedExpressionTokens[number]
+
+export type AllExpressionTokenType = ExpressionTokenType | ExtendedExpressionTokenType
+
+export const harloweOperatorConfigs: Record<AllExpressionTokenType, OperatorConfig> = {
   // Comma operator - lowest precedence
   'comma': {
     precedence: 1,
@@ -80,175 +86,204 @@ export const harloweOperatorConfigs: Record<ExpressionTokenType, OperatorConfig>
     infix: true,
   },
 
+  // Contextual keywords with lower precedence
+  'via': {
+    precedence: 4,
+    associativity: 'left',
+    infix: true,
+  },
+  'where': {
+    precedence: 4,
+    associativity: 'left',
+    prefix: true,
+    infix: true,
+  },
+  'when': {
+    precedence: 4,
+    prefix: true,
+  },
+  'making': {
+    precedence: 4,
+    associativity: 'left',
+    infix: true,
+  },
+  'each': {
+    precedence: 4,
+    prefix: true,
+  },
+  'bind': {
+    precedence: 4,
+    prefix: true,
+  },
+
+  // Type restriction operator
+  'typeSignature': {
+    precedence: 6,
+    associativity: 'left',
+    infix: true,
+  },
+
+
   // Logical OR
   'or': {
-    precedence: 3,
+    precedence: 8,
     associativity: 'left',
     infix: true,
   },
 
   // Logical AND
   'and': {
-    precedence: 4,
+    precedence: 9,
     associativity: 'left',
     infix: true,
   },
 
   // Logical NOT (prefix)
   'not': {
-    precedence: 5,
+    precedence: 10,
     prefix: true,
   },
 
   // Comparison operators
   'is': {
-    precedence: 6,
+    precedence: 11,
     associativity: 'left',
     infix: true,
   },
   'isNot': {
-    precedence: 6,
+    precedence: 11,
     associativity: 'left',
     infix: true,
   },
   'isA': {
-    precedence: 6,
+    precedence: 11,
     associativity: 'left',
     infix: true,
   },
   'isNotA': {
-    precedence: 6,
+    precedence: 11,
     associativity: 'left',
     infix: true,
   },
   'matches': {
-    precedence: 6,
+    precedence: 11,
     associativity: 'left',
     infix: true,
   },
   'doesNotMatch': {
-    precedence: 6,
+    precedence: 11,
     associativity: 'left',
     infix: true,
   },
+
+  // Inequality operators
   'inequality': {
-    precedence: 6,
+    precedence: 11,
+    associativity: 'left',
+    infix: true,
+  },
+  'ge': {
+    precedence: 11,
+    associativity: 'left',
+    infix: true,
+  },
+  'le': {
+    precedence: 11,
+    associativity: 'left',
+    infix: true,
+  },
+  'gt': {
+    precedence: 11,
+    associativity: 'left',
+    infix: true,
+  },
+  'lt': {
+    precedence: 11,
     associativity: 'left',
     infix: true,
   },
 
   // Membership operators
   'isIn': {
-    precedence: 7,
+    precedence: 12,
     associativity: 'left',
     infix: true,
   },
   'isNotIn': {
-    precedence: 7,
+    precedence: 12,
     associativity: 'left',
     infix: true,
   },
   'contains': {
-    precedence: 7,
+    precedence: 12,
     associativity: 'left',
     infix: true,
   },
   'doesNotContain': {
-    precedence: 7,
+    precedence: 12,
     associativity: 'left',
     infix: true,
   },
 
   // Addition and subtraction
   'addition': {
-    precedence: 8,
+    precedence: 13,
     associativity: 'left',
     prefix: true,  // Unary plus
     infix: true,   // Binary addition
   },
   'subtraction': {
-    precedence: 8,
+    precedence: 13,
     associativity: 'left',
     prefix: true,  // Unary minus
     infix: true,   // Binary subtraction
   },
 
-  // Multiplication and division
+  // Multiplication, division and modulus
   'multiplication': {
-    precedence: 9,
+    precedence: 14,
     associativity: 'left',
     infix: true,
   },
   'division': {
-    precedence: 9,
+    precedence: 14,
+    associativity: 'left',
+    infix: true,
+  },
+  'modulus': {
+    precedence: 14,
     associativity: 'left',
     infix: true,
   },
 
   // Property access operators
   'possessiveOperator': {
-    precedence: 11,
+    precedence: 16,
     associativity: 'left',
     infix: true,
   },
   'belongingOperator': {
-    precedence: 11,
+    precedence: 16,
     associativity: 'right',
     infix: true,
   },
   'itsOperator': {
-    precedence: 11,
+    precedence: 16,
     prefix: true,
   },
   'belongingItOperator': {
-    precedence: 11,
-    postfix: true,
-  },
-
-  // Type signature
-  'typeSignature': {
-    precedence: 10,
-    associativity: 'left',
+    precedence: 16,
     postfix: true,
   },
 
   // Special operators
   'spread': {
-    precedence: 12,
+    precedence: 18,
     prefix: true,
   },
+}
 
-  // Contextual keywords with lower precedence
-  'via': {
-    precedence: 2,
-    associativity: 'left',
-    infix: true,
-  },
-  'where': {
-    precedence: 2,
-    associativity: 'left',
-    infix: true,
-  },
-  'when': {
-    precedence: 2,
-    prefix: true,
-  },
-  'making': {
-    precedence: 2,
-    associativity: 'left',
-    infix: true,
-  },
-  'each': {
-    precedence: 2,
-    prefix: true,
-  },
-  'bind': {
-    precedence: 2,
-    prefix: true,
-  },
-};
-
-export const parser = new PrattParser(harloweOperatorConfigs);
+// #endregion
 
 const _excludeSet = new Set<string>([
   'whitespace',
@@ -256,7 +291,7 @@ const _excludeSet = new Set<string>([
   'macroName',
   'br',
   'hr',
-]);
+])
 
 const _inequalityMap: Record<string, string> = {
   '<': 'lt',
@@ -264,7 +299,7 @@ const _inequalityMap: Record<string, string> = {
   '<=': 'le',
   '>=': 'ge',
   '!=': 'isNot',
-};
+}
 
 const _inequalityNegateMap: Record<string, string> = {
   '<': 'ge',
@@ -272,82 +307,170 @@ const _inequalityNegateMap: Record<string, string> = {
   '<=': 'gt',
   '>=': 'lt',
   '!=': 'is',
-};
+}
 
-export function parse(tokens: AnyToken[]): ASTNode | undefined {
-  const filteredTokens: PrattToken[] = [];
-  for (const t of tokens) {
-    const { type, start, end } = t;
-    if (_excludeSet.has(type)) {
-      continue;
+// Helper: Extract comma-separated arguments from AST
+function extractCommaArgs<T extends { type: string }>(ast: PrattASTNode<T> | undefined): PrattASTNode<T>[] {
+  if (!ast) return []
+
+  if (ast.type === 'binary' && (ast as BinaryNode<T>).operator === 'comma') {
+    const args: PrattASTNode<T>[] = []
+    let current: PrattASTNode<T> | undefined = ast
+
+    while (current?.type === 'binary' && (current as BinaryNode<T>).operator === 'comma') {
+      args.unshift((current as BinaryNode<T>).right)
+      current = (current as BinaryNode<T>).left
     }
+
+    if (current) {
+      args.unshift(current)
+    }
+
+    return args
+  }
+
+  return [ast]
+}
+
+// Helper: Filter out metadata properties from token
+function extractTokenValue(token: AnyToken) {
+  const {
+    innerMode, place, start, end, children,
+    matches, cannotCross, isFront, aka,
+    ...value
+  } = token
+  return value
+}
+
+const _unwrapMapping: Record<string, [oprOnLeft: boolean, alternativeOpr: ExpressionTokenType]> = {
+  'property': [true, 'possessiveOperator'],
+  'itsProperty': [true, 'itsOperator'],
+  'belongingProperty': [false, 'belongingOperator'],
+  'belongingItProperty': [false, 'belongingItOperator'],
+}
+
+function unwrapOperator(token: AnyToken) {
+  const { type, name } = token as any
+  if (!(type in _unwrapMapping)) {
+    return null
+  }
+  const [oprOnLeft, alternativeOpr] = _unwrapMapping[type]
+  const oprToken: PrattToken = {
+    type: 'opr',
+    start: oprOnLeft ? token.start : token.end,
+    end: oprOnLeft ? token.start : token.end,
+    value: alternativeOpr,
+  }
+  const propertyToken: PrattToken = {
+    type: 'expr',
+    start: token.start,
+    end: token.end,
+    value: {
+      type: 'text',
+      name,
+      text: name,
+      innerText: name,
+    },
+  }
+  return oprOnLeft ? [oprToken, propertyToken] : [propertyToken, oprToken]
+}
+
+// Token handlers: each returns a PrattToken or null to skip
+export type TokenHandler = (token: AnyToken) => PrattToken | PrattToken[] | null
+
+const tokenHandlers: Partial<Record<string, TokenHandler>> = {
+  'division': (t) => {
+    const { start, end } = t
+    return {
+      type: 'opr', start, end,
+      value: t.text === '%' ? 'modulus' : 'division',
+    }
+  },
+
+  'inequality': (t) => {
+    const { operator, negate, start, end } = t as any
+    const mappedOperator = negate
+      ? _inequalityNegateMap[operator]
+      : _inequalityMap[operator]
+    return {
+      type: 'opr', start, end,
+      value: mappedOperator,
+    }
+  },
+
+  'property': unwrapOperator,
+  'itsProperty': unwrapOperator,
+  'belongingProperty': unwrapOperator,
+  'belongingItProperty': unwrapOperator,
+}
+
+function getTokenHandler(tokenType: string): TokenHandler | undefined {
+  return tokenHandlers[tokenType]
+}
+
+export const Expression = Object.freeze({
+  parse: parseExpression,
+  getTokenHandler,
+  extractTokenValue,
+  extractCommaArgs,
+} as const)
+
+export function parseExpression<T = LeafNode>(
+  tokens: AnyToken[],
+  leafNodeCreator?: (token: PrattExprToken) => T,
+  extractValue?: boolean | Iterable<string>,
+): PrattASTNode<T> | undefined {
+  const filteredTokens: PrattToken[] = []
+
+  const extractAll = extractValue === true
+  const extractSet = extractValue && extractValue !== true
+    ? new Set<string>(extractValue)
+    : null
+
+  for (const token of tokens) {
+    const { type, start, end } = token
+
+    // Skip excluded tokens
+    if (_excludeSet.has(type)) {
+      continue
+    }
+
+    // Try specialized handler first
+    const handler = tokenHandlers[type]
+    if (handler) {
+      const result = handler(token)
+      if (result) {
+        if (Array.isArray(result)) {
+          filteredTokens.push(...result)
+        } else {
+          filteredTokens.push(result)
+        }
+      }
+      continue
+    }
+
+    // Handle generic expression tokens
     if (_allExpressionTokensSet.has(type)) {
-      if (type === 'division' && t.text === '%') {
-        filteredTokens.push({
-          type: 'opr', start, end,
-          value: 'modulus',
-        });
-        continue;
-      }
-      if (type === 'inequality') {
-        const { operator, negate } = t as any;
-        const mappedOperator = negate ? _inequalityNegateMap[operator] : _inequalityMap[operator];
-        filteredTokens.push({
-          type: 'opr', start, end,
-          value: mappedOperator,
-        });
-        continue;
-      }
       filteredTokens.push({
         type: 'opr', start, end,
         value: type,
-      });
-      continue;
+      })
+      continue
     }
-    if (type === 'grouping') {
-      filteredTokens.push({
-        type: 'expr', start, end,
-        value: parse(t.children),
-      });
-      continue;
-    }
-    if (type === 'macro') {
-      const rawArgs = parse(t.children);
-      const args: ASTNode[] = [];
-      if (!rawArgs) {
-        // do nothing
-      } else if (rawArgs.type === 'binary' && rawArgs.operator === 'comma') {
-        let current: ASTNode | undefined = rawArgs;
-        while (current && current.type === 'binary' && current.operator === 'comma') {
-          args.unshift(current.right);
-          current = current.left;
-        }
-        if (current) {
-          args.unshift(current);
-        }
-      } else {
-        args.push(rawArgs);
-      }
-      filteredTokens.push({
-        type: 'expr', start, end,
-        value: {
-          type: 'macro',
-          name: (t as MacroToken).name,
-          args,
-        },
-      });
-      continue;
-    }
-    const {
-      innerMode, place,
-      start: _, end: __, children,
-      matches, cannotCross, isFront, aka,
-      ...value
-    } = t;
+
+    // Default: wrap as expression with filtered properties
     filteredTokens.push({
       type: 'expr', start, end,
-      value,
-    });
+      value: (extractAll || (extractSet && extractSet.has(type)))
+        ? extractTokenValue(token)
+        : token,
+    })
   }
-  return parser.parse(filteredTokens);
+
+  const parser = new PrattParser({
+    operators: harloweOperatorConfigs,
+    leafNodeCreator,
+  })
+
+  return parser.parse(filteredTokens)
 }
