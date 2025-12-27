@@ -149,7 +149,7 @@ export type IncompleteToken = Partial<AnyToken | (Token & {
 
 // Root AST node - represents top-level content structure
 export type HarloweASTNode =
-	TextFlowNode | LinkNode | ExpressionNode
+	TextFlowNode | LinkNode | ExpressionNode | PassageFlowNode | PassageTextFlowNode
 
 // Expression nodes - represents executable code and values
 export type ExpressionNode =

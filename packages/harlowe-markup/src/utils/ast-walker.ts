@@ -2,7 +2,6 @@ import type {
   HarloweASTNode,
   ExpressionNode,
   CodeHookNode,
-  PassageFlowNode,
   TextFlowNode,
   PassageTextFlowNode,
   BuiltinChangerNode,
@@ -11,13 +10,10 @@ import type {
   MacroMetadata,
 } from '../markup/types.js'
 
-// Union of all possible AST node types
-export type AnyASTNode = HarloweASTNode | PassageFlowNode | PassageTextFlowNode
-
 export interface ASTWalkEvent {
-  node: AnyASTNode
+  node: HarloweASTNode
   entering: boolean
-  parent?: AnyASTNode
+  parent?: HarloweASTNode
   index?: number
 }
 
@@ -36,7 +32,7 @@ export class ASTWalker {
   /**
    * Walk a single node and its descendants
    */
-  walk(node: AnyASTNode, parent?: AnyASTNode, index?: number): boolean {
+  walk(node: HarloweASTNode, parent?: HarloweASTNode, index?: number): boolean {
     // Enter node
     const continueEnter = this.visitor({ node, entering: true, parent, index })
     if (continueEnter === false) {
@@ -51,7 +47,7 @@ export class ASTWalker {
     return continueExit !== false
   }
 
-  private visitChildren(node: AnyASTNode): void {
+  private visitChildren(node: HarloweASTNode): void {
     switch (node.type) {
       case 'codeHook':
       case 'builtinChanger':
@@ -104,7 +100,7 @@ export class ASTWalker {
     }
   }
 
-  private walkArray(nodes: AnyASTNode[], parent: AnyASTNode): void {
+  private walkArray(nodes: HarloweASTNode[], parent: HarloweASTNode): void {
     for (let i = 0; i < nodes.length; i++) {
       const shouldContinue = this.walk(nodes[i], parent, i)
       if (!shouldContinue) {
@@ -113,9 +109,9 @@ export class ASTWalker {
     }
   }
 
-  private walkTextFlowChildren(nodes: PassageTextFlowNode[], parent: AnyASTNode): void {
+  private walkTextFlowChildren(nodes: PassageTextFlowNode[], parent: HarloweASTNode): void {
     for (let i = 0; i < nodes.length; i++) {
-      const shouldContinue = this.walk(nodes[i] as AnyASTNode, parent, i)
+      const shouldContinue = this.walk(nodes[i] as HarloweASTNode, parent, i)
       if (!shouldContinue) {
         break
       }
@@ -127,7 +123,7 @@ export class ASTWalker {
  * Walk through AST with visitor pattern
  */
 export function walkAST(
-  node: AnyASTNode,
+  node: HarloweASTNode,
   visitor: ASTVisitor
 ): void {
   const walker = new ASTWalker(visitor)
@@ -138,8 +134,8 @@ export function walkAST(
  * Generator-based AST walker for convenient iteration
  */
 export function* traverseAST(
-  node: AnyASTNode,
-  parent?: AnyASTNode,
+  node: HarloweASTNode,
+  parent?: HarloweASTNode,
   index?: number
 ): Generator<ASTWalkEvent, void, unknown> {
   yield { node, entering: true, parent, index }
@@ -186,18 +182,18 @@ export function* traverseAST(
 
 function* traverseChainedMacro(
   chained: MacroMetadata,
-  parent: AnyASTNode,
+  parent: HarloweASTNode,
   index?: number
 ): Generator<ASTWalkEvent, void, unknown> {
-  const node: AnyASTNode = { type: 'macro', ...chained };
+  const node: HarloweASTNode = { type: 'macro', ...chained };
   yield { node, entering: true, parent, index }
   yield* traverseArrayNodes(chained.args, parent)
   yield { node, entering: false, parent, index }
 }
 
 function* traverseArrayNodes(
-  nodes: AnyASTNode[],
-  parent: AnyASTNode
+  nodes: HarloweASTNode[],
+  parent: HarloweASTNode
 ): Generator<ASTWalkEvent, void, unknown> {
   for (let i = 0; i < nodes.length; i++) {
     yield* traverseAST(nodes[i], parent, i)
@@ -206,10 +202,10 @@ function* traverseArrayNodes(
 
 function* traverseTextFlowChildren(
   nodes: PassageTextFlowNode[],
-  parent: AnyASTNode
+  parent: HarloweASTNode
 ): Generator<ASTWalkEvent, void, unknown> {
   for (let i = 0; i < nodes.length; i++) {
-    yield* traverseAST(nodes[i] as AnyASTNode, parent, i)
+    yield* traverseAST(nodes[i] as HarloweASTNode, parent, i)
   }
 }
 
@@ -217,10 +213,10 @@ function* traverseTextFlowChildren(
  * Collect all nodes matching a predicate
  */
 export function collectNodes(
-  root: AnyASTNode,
-  predicate: (node: AnyASTNode) => boolean
-): AnyASTNode[] {
-  const collected: AnyASTNode[] = []
+  root: HarloweASTNode,
+  predicate: (node: HarloweASTNode) => boolean
+): HarloweASTNode[] {
+  const collected: HarloweASTNode[] = []
   walkAST(root, ({ node, entering }) => {
     if (entering && predicate(node)) {
       collected.push(node)
@@ -233,10 +229,10 @@ export function collectNodes(
  * Find first node matching a predicate
  */
 export function findNode(
-  root: AnyASTNode,
-  predicate: (node: AnyASTNode) => boolean
-): AnyASTNode | undefined {
-  let found: AnyASTNode | undefined
+  root: HarloweASTNode,
+  predicate: (node: HarloweASTNode) => boolean
+): HarloweASTNode | undefined {
+  let found: HarloweASTNode | undefined
   walkAST(root, ({ node, entering }) => {
     if (entering && predicate(node)) {
       found = node
@@ -249,7 +245,7 @@ export function findNode(
 /**
  * Collect all expression nodes from an AST
  */
-export function collectExpressions(root: AnyASTNode): ExpressionNode[] {
+export function collectExpressions(root: HarloweASTNode): ExpressionNode[] {
   return collectNodes(root, (node): node is ExpressionNode => {
     const type = node.type
     return type === 'macro' || type === 'codeHook' ||
