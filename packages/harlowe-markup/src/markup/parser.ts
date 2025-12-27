@@ -2,7 +2,7 @@ import { Expression } from './expression.js'
 import type {
   AnyToken,
   CodeHookNode,
-  CodeHookChildNode,
+  PassageFlowNode,
   MacroToken,
   HookToken,
   TwineLinkToken,
@@ -12,7 +12,10 @@ import type {
   MacroNode,
   VariableNode,
   LinkNode,
-  TextFlowChildNode,
+  PassageTextFlowNode,
+  BuiltinChangerNode,
+  TextFlowNode,
+  UnclosedBuiltinChangerNode,
 } from './types.js'
 import type { PrattExprToken } from '../utils/pratt-parser.js'
 
@@ -58,6 +61,8 @@ function convertLeafToken({ value: _token }: PrattExprToken): ExpressionNode {
       return parseVariable(token as VariableToken | TempVariableToken)
     case 'text':
       return { type: 'rawVariable', name: token.text || '' }
+    case 'hookName':
+      return { type: 'hookName', name: token.name || '' }
 
     case 'colour':
     case 'string':
@@ -112,7 +117,7 @@ function parseHook(token: HookToken): CodeHookNode {
     name: token.name || undefined,
     initiallyHidden: token.hidden,
     unclosed: token.type === 'unclosedHook',
-    children: parseCodeHookChildren(token.children as AnyToken[]),
+    children: parsePassageFlow(token.children as AnyToken[]),
   }
 }
 
@@ -138,50 +143,144 @@ function parseLink(token: TwineLinkToken): LinkNode {
   }
 }
 
+function handleUnclosedHooks(nodeFlow: PassageFlowNode[]): PassageFlowNode[] {
+  const macroIndicesWithUnclosedHooks: number[] = []
+  for (let i = 0; i < nodeFlow.length; i++) {
+    const node = nodeFlow[i]
+    if (node.type === 'macro') {
+      const macro = node as MacroNode
+      if (macro.attachedHook && macro.attachedHook.unclosed) {
+        macroIndicesWithUnclosedHooks.push(i)
+      }
+    }
+  }
+
+  let i: number | undefined
+  while ((i = macroIndicesWithUnclosedHooks.pop()) !== undefined) {
+    const macro = nodeFlow[i] as MacroNode
+    const unclosedHook = macro.attachedHook as CodeHookNode
+    const childrenNodes = nodeFlow.splice(i + 1)
+    unclosedHook.children.push(...childrenNodes)
+  }
+  return nodeFlow
+}
+
 /**
  * Parse children tokens into CodeHookChildNode array
  */
-function parseCodeHookChildren(tokens: AnyToken[]): CodeHookChildNode[] {
-  const children: CodeHookChildNode[] = []
-  const textFlowBuffer: TextFlowChildNode[] = []
+function parsePassageFlow(tokens: AnyToken[]): PassageFlowNode[] {
+  const children: PassageFlowNode[] = []
+
+  const textFlowBuffer: PassageTextFlowNode[] = []
+  const flushText = (forceNewNode: boolean = false) => {
+    // Merge consecutive text nodes
+    if (!textFlowBuffer.length) {
+      return
+    }
+    const mergedBuffer: PassageTextFlowNode[] = []
+    for (let i = 0; i < textFlowBuffer.length; i++) {
+      const current = textFlowBuffer[i]
+      if (current.type === 'text') {
+        const last = mergedBuffer[mergedBuffer.length - 1]
+        if (last && last.type === 'text') {
+          // Merge with previous text node
+          last.content += current.content
+        } else {
+          // Add as new node
+          mergedBuffer.push(current)
+        }
+      } else {
+        // Non-text node, just add it
+        mergedBuffer.push(current)
+      }
+    }
+
+    // Replace textFlowBuffer content with merged content
+    textFlowBuffer.splice(0, textFlowBuffer.length)
+
+    if (mergedBuffer.length > 0) {
+      if (!forceNewNode && children.length > 0 && children[children.length - 1].type === 'textFlow') {
+        // Merge with previous textFlow
+        const lastTextFlow = children[children.length - 1] as TextFlowNode
+        lastTextFlow.children.push(...mergedBuffer)
+      } else {
+        // Create new textFlow
+        children.push({
+          type: 'textFlow',
+          children: mergedBuffer,
+        })
+      }
+    }
+  }
+
   let currentMacro: MacroNode | null = null
-  let marcoChainContextText: string | null = null
+  let macroChainContextText: string | null = null
 
   const flushMacro = () => {
     if (currentMacro) {
       children.push(currentMacro)
       currentMacro = null
     }
-    if (marcoChainContextText) {
-      textFlowBuffer.push({ type: 'text', content: marcoChainContextText })
-      marcoChainContextText = null
-    }
-  }
-  const flushText = () => {
-    if (textFlowBuffer.length > 0) {
-      children.push({
-        type: 'textFlow',
-        children: [...textFlowBuffer],
-      })
-      textFlowBuffer.splice(0, textFlowBuffer.length)
+    if (macroChainContextText) {
+      textFlowBuffer.push({ type: 'text', content: macroChainContextText })
+      macroChainContextText = null
     }
   }
 
-  const flush = () => {
+  let leadingChangerType: string | null = null
+  let leadingChangerData: any | null = null
+  let leadingChangerStartIndex: number | null = null
+
+  const flushLeadingChanger = () => {
+    if (leadingChangerType == null || leadingChangerStartIndex == null) {
+      return false
+    }
+    flush(true)
+    const changerChildren = children.splice(leadingChangerStartIndex)
+    handleUnclosedHooks(changerChildren)
+    const child: BuiltinChangerNode = {
+      type: 'builtinChanger',
+      changer: leadingChangerType,
+      children: changerChildren,
+    }
+    if (leadingChangerData != null) {
+      child.data = leadingChangerData
+    }
+    children.push(child)
+    leadingChangerType = null
+    leadingChangerData = null
+    leadingChangerStartIndex = null
+    return true
+  }
+
+  const flushMacroChainText = () => {
+    if (macroChainContextText != null) {
+      textFlowBuffer.push({ type: 'text', content: macroChainContextText })
+      macroChainContextText = null
+    }
+  }
+
+  const flush = (forceNewNode: boolean = false) => {
     flushMacro()
-    flushText()
+    flushMacroChainText()
+    flushText(forceNewNode)
   }
 
   for (const token of tokens) {
+
+    if (token.type !== 'macro') {
+      flushMacroChainText()
+    }
+
     switch (token.type) {
       case 'macro':
-        if (currentMacro && marcoChainContextText != null) {
+        if (currentMacro && macroChainContextText != null) {
           // Handle macro chaining
           // (e.g., (changer1: ...)+(changer2: ...))
           currentMacro.chainedMacros = currentMacro.chainedMacros || []
           const { name, args } = parseMacro(token as MacroToken)
           currentMacro.chainedMacros.push({ name, args })
-          marcoChainContextText = null
+          macroChainContextText = null
           break
         }
         flush()
@@ -212,23 +311,40 @@ function parseCodeHookChildren(tokens: AnyToken[]): CodeHookChildNode[] {
         children.push(parseVariable(token as VariableToken | TempVariableToken))
         break
 
-      case 'text':
-      case 'whitespace':
-        if (token.text.trim() === '+' && currentMacro) {
-          // Macro chaining context
-          // (e.g., (changer1: ...)+(changer2: ...))
-          marcoChainContextText = token.text
-        } else {
-          textFlowBuffer.push({ type: 'text', content: token.text || '' })
-        }
+      case 'tag':
+      case 'scriptStyleTag':
+        flush()
+        children.push({
+          type: 'htmlTag',
+          tag: (token as any).tag
+            || token.text?.match(/^<\/?([a-zA-Z0-9\-]+)/)?.[1]
+            || (token.type === 'tag' ? 'div' : 'script'),
+          content: token.text
+        })
         break
 
       case 'br':
-        textFlowBuffer.push({ type: 'lineBreak' })
+      case 'hr':
+      case 'escapedLine':
+        if (
+          (token.type === 'br' || token.type === 'hr')
+          && flushLeadingChanger()
+        ) {
+          break
+        }
+        textFlowBuffer.push({ type: 'textElement', element: token.type })
         break
 
-      case 'hr':
-        textFlowBuffer.push({ type: 'horizontalRule' })
+      case 'heading':
+      case 'bulleted':
+      case 'numbered':
+        flushLeadingChanger() || flush(true)
+        leadingChangerType = token.type
+        leadingChangerData = Expression.extractTokenValue(token, true)
+        if (Object.keys(leadingChangerData).length === 0) {
+          leadingChangerData = null
+        }
+        leadingChangerStartIndex = children.length
         break
 
       // Formatted text nodes
@@ -239,47 +355,85 @@ function parseCodeHookChildren(tokens: AnyToken[]): CodeHookChildNode[] {
       case 'strike':
       case 'sub':
       case 'sup':
-        const formatted = parseFormatted(token)
-        textFlowBuffer.push(formatted)
+      case 'collapsed':
+        flush()
+        const changer = parseBuiltinChanger(token)
+        children.push(changer)
+        break
+
+      case 'unclosedCollapsed':
+      case 'align':
+      case 'column':
+        flush()
+        const unclosedChanger = parseUnclosedBuiltinChanger(token)
+        children.push(unclosedChanger)
+        break
+
+      case 'verbatim':
+        const verbatimNodes = parseVerbatimNodeTextFlow(token)
+        textFlowBuffer.push(...verbatimNodes)
+        break
+
+
+      case 'text':
+      case 'whitespace':
+        if (token.text.trim() === '+' && currentMacro) {
+          // Macro chaining context
+          // (e.g., (changer1: ...)+(changer2: ...))
+          macroChainContextText = token.text
+        } else {
+          textFlowBuffer.push({ type: 'text', content: token.text || '' })
+        }
         break
 
       default:
         // This should never happen for well-formed tokens
-        throw new ParserError(`Unexpected token type in code hook children: ${token.type}`, token)
+        // unless there is an unclosed macro or hook...
+        textFlowBuffer.push({ type: 'text', content: token.text || '' })
     }
   }
 
   flush()
+  flushLeadingChanger()
+  handleUnclosedHooks(children)
   return children
 }
 
-/**
- * Parse formatted text token
- */
-function parseFormatted(token: AnyToken) {
-  const style = token.type
-  const textContent: string[] = []
+function parseVerbatimNodeTextFlow(token: AnyToken): PassageTextFlowNode[] {
+  const allTexts = token.innerText?.split('\n') || []
+  const children: PassageTextFlowNode[] = []
 
-  const extractText = (tokens: AnyToken[]): void => {
-    for (const t of tokens) {
-      if (t.type === 'text' || t.type === 'whitespace') {
-        textContent.push(t.text || '')
-      } else if (t.children) {
-        extractText(t.children)
-      }
+  for (let i = 0; i < allTexts.length; i++) {
+    if (i > 0) {
+      children.push({ type: 'textElement', element: 'br' })
+    }
+    if (allTexts[i].length > 0) {
+      children.push({ type: 'text', content: allTexts[i] })
     }
   }
+  return children
+}
 
-  extractText(token.children || [])
-
+function parseBuiltinChanger(token: AnyToken): BuiltinChangerNode {
+  const changer = token.type
   return {
-    type: 'formatted' as const,
-    style,
-    children: [{
-      type: 'text' as const,
-      content: textContent.join(''),
-    }],
+    type: 'builtinChanger' as const,
+    changer,
+    children: parsePassageFlow(token.children || []),
   }
+}
+
+function parseUnclosedBuiltinChanger(token: AnyToken): UnclosedBuiltinChangerNode {
+  const changer = token.type === 'unclosedCollapsed' ? 'collapsed' : token.type
+  const data = Expression.extractTokenValue(token, true)
+  const ret: UnclosedBuiltinChangerNode = {
+    type: 'unclosedBuiltinChanger' as const,
+    changer,
+  }
+  if (data != null && Object.keys(data).length > 0) {
+    ret.data = data
+  }
+  return ret
 }
 
 /**
@@ -294,7 +448,7 @@ export function parseRootToCodeHook(rootToken: AnyToken): CodeHookNode {
 
   return {
     type: 'codeHook',
-    children: parseCodeHookChildren(rootToken.children || []),
+    children: parsePassageFlow(rootToken.children || []),
   }
 }
 
@@ -303,5 +457,5 @@ export function parseRootToCodeHook(rootToken: AnyToken): CodeHookNode {
  */
 export const Parser = Object.freeze({
   parse: parseRootToCodeHook,
-  parseCodeHookChildren,
+  parsePassageFlow,
 } as const)

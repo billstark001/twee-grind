@@ -333,12 +333,17 @@ function extractCommaArgs<T extends { type: string }>(ast: PrattASTNode<T> | und
 }
 
 // Helper: Filter out metadata properties from token
-function extractTokenValue(token: AnyToken) {
+function extractTokenValue(token: AnyToken, omitCommon = false): any {
   const {
     innerMode, place, start, end, children,
     matches, cannotCross, isFront, aka,
     ...value
   } = token
+  if (omitCommon) {
+    delete (value as any).type
+    delete (value as any).text
+    delete (value as any).innerText
+  }
   return value
 }
 

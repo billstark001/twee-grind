@@ -153,11 +153,18 @@ export type HarloweASTNode =
 
 // Expression nodes - represents executable code and values
 export type ExpressionNode =
-	OperatorNode | LiteralNode | VariableNode | RawVariableNode | MacroNode | CodeHookNode
+	OperatorNode | LiteralNode | VariableNode | RawVariableNode | HookNameNode | MacroNode | CodeHookNode
 
 // Valid children inside code hooks (named hooks like [text]<name|)
-export type CodeHookChildNode =
-	TextFlowNode | CodeHookNode | LinkNode | MacroNode | VariableNode
+export type PassageFlowNode =
+	| BuiltinChangerNode
+	| UnclosedBuiltinChangerNode
+	| TextFlowNode
+	| HtmlTagNode
+	| CodeHookNode
+	| LinkNode
+	| MacroNode
+	| VariableNode
 
 // Code hook - named or unnamed block with optional visibility control
 export interface CodeHookNode {
@@ -166,20 +173,18 @@ export interface CodeHookNode {
 	name?: string
 	initiallyHidden?: boolean // starts with | instead of [
 	unclosed?: boolean
-	children: CodeHookChildNode[]
+	children: PassageFlowNode[]
 }
 
 // Valid children in text flow (narrative content)
-export type TextFlowChildNode =
+export type PassageTextFlowNode =
 	| TextNode
-	| FormattedTextNode
-	| LineBreakNode
-	| HorizontalRuleNode
+	| TextElementNode
 
 // Text flow - continuous narrative content
 export interface TextFlowNode {
 	type: 'textFlow'
-	children: TextFlowChildNode[]
+	children: PassageTextFlowNode[]
 }
 
 // Plain text node
@@ -188,22 +193,32 @@ export interface TextNode {
 	content: string
 }
 
+export interface HtmlTagNode {
+	type: 'htmlTag'
+	tag: string // only the tag name, e.g., "div", "span" for now
+	content: string
+}
+
 // Formatted text with style (bold, italic, etc.)
-export interface FormattedTextNode {
-	type: 'formatted'
-	style: string
-	children: (TextNode | FormattedTextNode)[]
+export interface BuiltinChangerNode {
+	type: 'builtinChanger'
+	changer: string
+	data?: any
+	children: PassageFlowNode[]
 }
 
-// Line break
-export interface LineBreakNode {
-	type: 'lineBreak'
+export interface UnclosedBuiltinChangerNode {
+	type: 'unclosedBuiltinChanger'
+	changer: string
+	data?: any
 }
 
-// Horizontal rule/divider
-export interface HorizontalRuleNode {
-	type: 'horizontalRule'
+// Void text elements (line breaks, horizontal rules, etc.)
+export interface TextElementNode {
+	type: 'textElement'
+	element: string
 }
+
 
 // Passage link [[text->passage]]
 export interface LinkNode {
@@ -236,6 +251,11 @@ export interface VariableNode {
 export interface RawVariableNode {
 	type: 'rawVariable'
 	name: string // reserved words (num, ...), property accessor (1stto4th, ...), etc.
+}
+
+export interface HookNameNode {
+	type: 'hookName'
+	name: string
 }
 
 // Operator nodes (unary/binary operations)

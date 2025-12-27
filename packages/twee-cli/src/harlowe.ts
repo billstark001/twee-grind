@@ -61,17 +61,25 @@ export const harlowe = {
         process.stdout.write(`${pad}[${node.type}${(node as any).name ? ':' + (node as any).name : ''}]`);
         const { name, children,
           innerMode, matches, cannotCross, isFront,
-          type, start, end, text, innerText, place,
+          type, start, end, text, innerText, place, aka,
           ...rest
         } = node as any;
-        let textDisplay = JSON.stringify(node.text) ?? JSON.stringify(node.innerText) ?? '';
-        if (Object.keys(rest).length > 0) {
-          textDisplay += (textDisplay ? ' ' : '') + JSON.stringify(rest);
-        }
+        const textDisplay = node.text ? JSON.stringify(node.text) : '';
+        const innerTextDisplay = node.innerText ? JSON.stringify(node.innerText) : '';
+        const objectDisplay = Object.keys(rest).length === 0 ? '' : JSON.stringify(rest);
         console.log(' ' + (textDisplay.length > DISP_LENGTH
           ? textDisplay.slice(0, DISP_LENGTH - 3) + '...'
           : textDisplay
         ));
+        if (innerTextDisplay) {
+          console.log(`${pad} (innerText) ` + (innerTextDisplay.length > DISP_LENGTH
+            ? innerTextDisplay.slice(0, DISP_LENGTH - 3) + '...'
+            : innerTextDisplay
+          ));
+        }
+        if (objectDisplay) {
+          console.log(`${pad} (data) ` + objectDisplay);
+        }
 
         ++layer;
       }

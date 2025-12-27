@@ -2,17 +2,17 @@ import type {
   HarloweASTNode,
   ExpressionNode,
   CodeHookNode,
-  CodeHookChildNode,
+  PassageFlowNode,
   TextFlowNode,
-  TextFlowChildNode,
-  FormattedTextNode,
+  PassageTextFlowNode,
+  BuiltinChangerNode,
   MacroNode,
   OperatorNode,
   MacroMetadata,
 } from '../markup/types.js'
 
 // Union of all possible AST node types
-export type AnyASTNode = HarloweASTNode | CodeHookChildNode | TextFlowChildNode
+export type AnyASTNode = HarloweASTNode | PassageFlowNode | PassageTextFlowNode
 
 export interface ASTWalkEvent {
   node: AnyASTNode
@@ -54,15 +54,12 @@ export class ASTWalker {
   private visitChildren(node: AnyASTNode): void {
     switch (node.type) {
       case 'codeHook':
-        this.walkArray((node as CodeHookNode).children, node)
+      case 'builtinChanger':
+        this.walkArray((node as CodeHookNode | BuiltinChangerNode).children, node)
         break
 
       case 'textFlow':
         this.walkTextFlowChildren((node as TextFlowNode).children, node)
-        break
-
-      case 'formatted':
-        this.walkTextFlowChildren((node as FormattedTextNode).children, node)
         break
 
       case 'macro':
@@ -92,8 +89,7 @@ export class ASTWalker {
 
       // Leaf nodes with no children
       case 'text':
-      case 'lineBreak':
-      case 'horizontalRule':
+      case 'textElement':
       case 'link':
       case 'variable':
       case 'rawVariable':
@@ -117,7 +113,7 @@ export class ASTWalker {
     }
   }
 
-  private walkTextFlowChildren(nodes: TextFlowChildNode[], parent: AnyASTNode): void {
+  private walkTextFlowChildren(nodes: PassageTextFlowNode[], parent: AnyASTNode): void {
     for (let i = 0; i < nodes.length; i++) {
       const shouldContinue = this.walk(nodes[i] as AnyASTNode, parent, i)
       if (!shouldContinue) {
@@ -151,15 +147,12 @@ export function* traverseAST(
   // Visit children based on node type
   switch (node.type) {
     case 'codeHook':
-      yield* traverseArrayNodes((node as CodeHookNode).children, node)
+    case 'builtinChanger':
+      yield* traverseArrayNodes((node as CodeHookNode | BuiltinChangerNode).children, node)
       break
 
     case 'textFlow':
       yield* traverseTextFlowChildren((node as TextFlowNode).children, node)
-      break
-
-    case 'formatted':
-      yield* traverseTextFlowChildren((node as FormattedTextNode).children, node)
       break
 
     case 'macro':
@@ -212,7 +205,7 @@ function* traverseArrayNodes(
 }
 
 function* traverseTextFlowChildren(
-  nodes: TextFlowChildNode[],
+  nodes: PassageTextFlowNode[],
   parent: AnyASTNode
 ): Generator<ASTWalkEvent, void, unknown> {
   for (let i = 0; i < nodes.length; i++) {
