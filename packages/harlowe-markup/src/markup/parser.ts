@@ -16,8 +16,21 @@ import type {
   BuiltinChangerNode,
   TextFlowNode,
   UnclosedBuiltinChangerNode,
+  ASTPosition,
 } from './types.js'
 import type { PrattExprToken } from '../utils/pratt-parser.js'
+
+/**
+ * Extract position information from token
+ */
+function extractPosition(token?: AnyToken): ASTPosition {
+  if (!token) return {}
+  return {
+    start: token.start,
+    end: token.end,
+    place: token.place,
+  }
+}
 
 /**
  * Custom error class for parser errors with token position information
@@ -60,9 +73,9 @@ function convertLeafToken({ value: _token }: PrattExprToken): ExpressionNode {
     case 'tempVariable':
       return parseVariable(token as VariableToken | TempVariableToken)
     case 'text':
-      return { type: 'rawVariable', name: token.text || '' }
+      return { type: 'rawVariable', name: token.text || '', ...extractPosition(token) }
     case 'hookName':
-      return { type: 'hookName', name: token.name || '' }
+      return { type: 'hookName', name: token.name || '', ...extractPosition(token) }
 
     case 'colour':
     case 'string':
@@ -72,6 +85,7 @@ function convertLeafToken({ value: _token }: PrattExprToken): ExpressionNode {
         type: 'literal',
         dataType: token.type,
         value: token.text,
+        ...extractPosition(token),
       }
 
     case 'grouping':
@@ -105,6 +119,7 @@ function parseMacro(token: MacroToken): MacroNode {
     type: 'macro',
     name: token.name,
     args,
+    ...extractPosition(token as AnyToken),
   }
 }
 
@@ -118,6 +133,7 @@ function parseHook(token: HookToken): CodeHookNode {
     initiallyHidden: token.hidden,
     unclosed: token.type === 'unclosedHook',
     children: parsePassageFlow(token.children as AnyToken[]),
+    ...extractPosition(token as AnyToken),
   }
 }
 
@@ -129,6 +145,7 @@ function parseVariable(token: VariableToken | TempVariableToken): VariableNode {
     type: 'variable',
     name: token.name,
     isTemp: token.type === 'tempVariable',
+    ...extractPosition(token as AnyToken),
   }
 }
 
@@ -140,6 +157,7 @@ function parseLink(token: TwineLinkToken): LinkNode {
     type: 'link',
     text: token.innerText || token.passage,
     passage: token.passage,
+    ...extractPosition(token as AnyToken),
   }
 }
 
@@ -319,7 +337,8 @@ function parsePassageFlow(tokens: AnyToken[]): PassageFlowNode[] {
           tag: (token as any).tag
             || token.text?.match(/^<\/?([a-zA-Z0-9\-]+)/)?.[1]
             || (token.type === 'tag' ? 'div' : 'script'),
-          content: token.text
+          content: token.text,
+          ...extractPosition(token),
         })
         break
 
@@ -332,7 +351,7 @@ function parsePassageFlow(tokens: AnyToken[]): PassageFlowNode[] {
         ) {
           break
         }
-        textFlowBuffer.push({ type: 'textElement', element: token.type })
+        textFlowBuffer.push({ type: 'textElement', element: token.type, ...extractPosition(token) })
         break
 
       case 'heading':
@@ -382,7 +401,7 @@ function parsePassageFlow(tokens: AnyToken[]): PassageFlowNode[] {
           // (e.g., (changer1: ...)+(changer2: ...))
           macroChainContextText = token.text
         } else {
-          textFlowBuffer.push({ type: 'text', content: token.text || '' })
+          textFlowBuffer.push({ type: 'text', content: token.text || '', ...extractPosition(token) })
         }
         break
 
@@ -402,13 +421,24 @@ function parsePassageFlow(tokens: AnyToken[]): PassageFlowNode[] {
 function parseVerbatimNodeTextFlow(token: AnyToken): PassageTextFlowNode[] {
   const allTexts = token.innerText?.split('\n') || []
   const children: PassageTextFlowNode[] = []
+  const pos = extractPosition(token)
+  let currentPos = pos.start ?? 0
 
   for (let i = 0; i < allTexts.length; i++) {
     if (i > 0) {
       children.push({ type: 'textElement', element: 'br' })
+      currentPos += 1 // newline character
     }
     if (allTexts[i].length > 0) {
-      children.push({ type: 'text', content: allTexts[i] })
+      const textNode = {
+        type: 'text' as const,
+        content: allTexts[i],
+        start: currentPos,
+        end: currentPos + allTexts[i].length,
+        place: pos.place,
+      }
+      children.push(textNode)
+      currentPos += allTexts[i].length
     }
   }
   return children
@@ -420,6 +450,7 @@ function parseBuiltinChanger(token: AnyToken): BuiltinChangerNode {
     type: 'builtinChanger' as const,
     changer,
     children: parsePassageFlow(token.children || []),
+    ...extractPosition(token),
   }
 }
 
@@ -429,6 +460,7 @@ function parseUnclosedBuiltinChanger(token: AnyToken): UnclosedBuiltinChangerNod
   const ret: UnclosedBuiltinChangerNode = {
     type: 'unclosedBuiltinChanger' as const,
     changer,
+    ...extractPosition(token),
   }
   if (data != null && Object.keys(data).length > 0) {
     ret.data = data
@@ -449,6 +481,7 @@ export function parseRootToCodeHook(rootToken: AnyToken): CodeHookNode {
   return {
     type: 'codeHook',
     children: parsePassageFlow(rootToken.children || []),
+    ...extractPosition(rootToken),
   }
 }
 

@@ -147,13 +147,24 @@ export type IncompleteToken = Partial<AnyToken | (Token & {
 
 // #region syntax tree types
 
+// Position information for AST nodes
+export interface ASTPosition {
+	start?: number
+	end?: number
+	place?: string
+}
+
 // Root AST node - represents top-level content structure
 export type HarloweASTNode =
 	TextFlowNode | LinkNode | ExpressionNode | PassageFlowNode | PassageTextFlowNode
 
+export type HarloweASTNodeType = HarloweASTNode['type']
+
 // Expression nodes - represents executable code and values
 export type ExpressionNode =
 	OperatorNode | LiteralNode | VariableNode | RawVariableNode | HookNameNode | MacroNode | CodeHookNode
+
+export type ExpressionNodeType = ExpressionNode['type']
 
 // Valid children inside code hooks (named hooks like [text]<name|)
 export type PassageFlowNode =
@@ -166,8 +177,10 @@ export type PassageFlowNode =
 	| MacroNode
 	| VariableNode
 
+export type PassageFlowNodeType = PassageFlowNode['type']
+
 // Code hook - named or unnamed block with optional visibility control
-export interface CodeHookNode {
+export interface CodeHookNode extends ASTPosition {
 	type: 'codeHook'
 	storyletMetadata?: Record<string, any>
 	name?: string
@@ -182,46 +195,46 @@ export type PassageTextFlowNode =
 	| TextElementNode
 
 // Text flow - continuous narrative content
-export interface TextFlowNode {
+export interface TextFlowNode extends ASTPosition {
 	type: 'textFlow'
 	children: PassageTextFlowNode[]
 }
 
 // Plain text node
-export interface TextNode {
+export interface TextNode extends ASTPosition {
 	type: 'text'
 	content: string
 }
 
-export interface HtmlTagNode {
+export interface HtmlTagNode extends ASTPosition {
 	type: 'htmlTag'
 	tag: string // only the tag name, e.g., "div", "span" for now
 	content: string
 }
 
 // Formatted text with style (bold, italic, etc.)
-export interface BuiltinChangerNode {
+export interface BuiltinChangerNode extends ASTPosition {
 	type: 'builtinChanger'
 	changer: string
 	data?: any
 	children: PassageFlowNode[]
 }
 
-export interface UnclosedBuiltinChangerNode {
+export interface UnclosedBuiltinChangerNode extends ASTPosition {
 	type: 'unclosedBuiltinChanger'
 	changer: string
 	data?: any
 }
 
 // Void text elements (line breaks, horizontal rules, etc.)
-export interface TextElementNode {
+export interface TextElementNode extends ASTPosition {
 	type: 'textElement'
 	element: string
 }
 
 
 // Passage link [[text->passage]]
-export interface LinkNode {
+export interface LinkNode extends ASTPosition {
 	type: 'link'
 	text: string
 	passage: string
@@ -234,26 +247,26 @@ export interface MacroMetadata {
 }
 
 // Macro invocation with optional chaining and attached hook
-export interface MacroNode extends MacroMetadata {
+export interface MacroNode extends MacroMetadata, ASTPosition {
 	type: 'macro'
 	chainedMacros?: MacroMetadata[] // (set:)(if:) chains
 	attachedHook?: CodeHookNode // (if: $x)[text]
 }
 
 // Story/temp variable reference
-export interface VariableNode {
+export interface VariableNode extends ASTPosition {
 	type: 'variable'
 	name: string
 	isTemp?: boolean // _temp vs $story
 }
 
 // Raw identifier (reserved words, properties)
-export interface RawVariableNode {
+export interface RawVariableNode extends ASTPosition {
 	type: 'rawVariable'
 	name: string // reserved words (num, ...), property accessor (1stto4th, ...), etc.
 }
 
-export interface HookNameNode {
+export interface HookNameNode extends ASTPosition {
 	type: 'hookName'
 	name: string
 }
@@ -262,14 +275,14 @@ export interface HookNameNode {
 export type OperatorNode = UnaryOperatorNode | BinaryOperatorNode
 
 // Unary operator (prefix/postfix)
-export interface UnaryOperatorNode {
+export interface UnaryOperatorNode extends ASTPosition {
 	type: 'prefix' | 'postfix'
 	operator: string
 	operand: ExpressionNode
 }
 
 // Binary operator (infix)
-export interface BinaryOperatorNode {
+export interface BinaryOperatorNode extends ASTPosition {
 	type: 'binary'
 	operator: string
 	left: ExpressionNode
@@ -277,7 +290,7 @@ export interface BinaryOperatorNode {
 }
 
 // Literal value (number, string, etc.)
-export interface LiteralNode {
+export interface LiteralNode extends ASTPosition {
 	type: 'literal'
 	dataType: string
 	value: any
