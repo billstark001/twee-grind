@@ -355,23 +355,32 @@ const _unwrapMapping: Record<string, [oprOnLeft: boolean, alternativeOpr: Expres
 }
 
 function unwrapOperator(token: AnyToken) {
-  const { type, name } = token as any
+  const { type, name, text, start, end, place } = token as any
   if (!(type in _unwrapMapping)) {
     return null
   }
+  const rawNameStart = (text as string)?.indexOf(name) ?? -1
+  const [nameStart, nameEnd] = rawNameStart >= 0
+    ? [start! + rawNameStart, start! + rawNameStart + name.length]
+    : [start, end]
   const [oprOnLeft, alternativeOpr] = _unwrapMapping[type]
   const oprToken: PrattToken = {
     type: 'opr',
-    start: oprOnLeft ? token.start : token.end,
-    end: oprOnLeft ? token.start : token.end,
+    start: oprOnLeft ? start : nameEnd,
+    end: oprOnLeft ? nameStart : end,
+    place,
     value: alternativeOpr,
   }
   const propertyToken: PrattToken = {
     type: 'expr',
-    start: token.start,
-    end: token.end,
+    start: nameStart,
+    end: nameEnd,
+    place,
     value: {
       type: 'text',
+      start: nameStart,
+      end: nameEnd,
+      place,
       name,
       text: name,
       innerText: name,
@@ -385,20 +394,20 @@ export type TokenHandler = (token: AnyToken) => PrattToken | PrattToken[] | null
 
 const tokenHandlers: Partial<Record<string, TokenHandler>> = {
   'division': (t) => {
-    const { start, end } = t
+    const { start, end, place } = t
     return {
-      type: 'opr', start, end,
+      type: 'opr', start, end, place,
       value: t.text === '%' ? 'modulus' : 'division',
     }
   },
 
   'inequality': (t) => {
-    const { operator, negate, start, end } = t as any
+    const { operator, negate, start, end, place } = t as any
     const mappedOperator = negate
       ? _inequalityNegateMap[operator]
       : _inequalityMap[operator]
     return {
-      type: 'opr', start, end,
+      type: 'opr', start, end, place,
       value: mappedOperator,
     }
   },
@@ -433,7 +442,7 @@ export function parseExpression<T = LeafNode>(
     : null
 
   for (const token of tokens) {
-    const { type, start, end } = token
+    const { type, start, end, place } = token
 
     // Skip excluded tokens
     if (_excludeSet.has(type)) {
@@ -457,7 +466,7 @@ export function parseExpression<T = LeafNode>(
     // Handle generic expression tokens
     if (_allExpressionTokensSet.has(type)) {
       filteredTokens.push({
-        type: 'opr', start, end,
+        type: 'opr', start, end, place,
         value: type,
       })
       continue
@@ -465,7 +474,7 @@ export function parseExpression<T = LeafNode>(
 
     // Default: wrap as expression with filtered properties
     filteredTokens.push({
-      type: 'expr', start, end,
+      type: 'expr', start, end, place,
       value: (extractAll || (extractSet && extractSet.has(type)))
         ? extractTokenValue(token)
         : token,

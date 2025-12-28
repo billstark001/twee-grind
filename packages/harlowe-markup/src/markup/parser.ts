@@ -203,6 +203,7 @@ function parsePassageFlow(tokens: AnyToken[]): PassageFlowNode[] {
         if (last && last.type === 'text') {
           // Merge with previous text node
           last.content += current.content
+          last.end = current.end
         } else {
           // Add as new node
           mergedBuffer.push(current)
@@ -232,16 +233,17 @@ function parsePassageFlow(tokens: AnyToken[]): PassageFlowNode[] {
   }
 
   let currentMacro: MacroNode | null = null
-  let macroChainContextText: string | null = null
+  let macroChainContextToken: AnyToken | null = null
 
   const flushMacro = () => {
     if (currentMacro) {
       children.push(currentMacro)
       currentMacro = null
     }
-    if (macroChainContextText) {
-      textFlowBuffer.push({ type: 'text', content: macroChainContextText })
-      macroChainContextText = null
+    if (macroChainContextToken) {
+      const { text: content = '' } = macroChainContextToken
+      textFlowBuffer.push({ type: 'text', content, ...extractPosition(macroChainContextToken) })
+      macroChainContextToken = null
     }
   }
 
@@ -271,34 +273,24 @@ function parsePassageFlow(tokens: AnyToken[]): PassageFlowNode[] {
     return true
   }
 
-  const flushMacroChainText = () => {
-    if (macroChainContextText != null) {
-      textFlowBuffer.push({ type: 'text', content: macroChainContextText })
-      macroChainContextText = null
-    }
-  }
-
   const flush = (forceNewNode: boolean = false) => {
     flushMacro()
-    flushMacroChainText()
     flushText(forceNewNode)
   }
 
-  for (const token of tokens) {
-
-    if (token.type !== 'macro') {
-      flushMacroChainText()
-    }
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i]
+    const nextTokenType = tokens[i + 1]?.type || null
 
     switch (token.type) {
       case 'macro':
-        if (currentMacro && macroChainContextText != null) {
+        if (currentMacro && macroChainContextToken != null) {
           // Handle macro chaining
           // (e.g., (changer1: ...)+(changer2: ...))
           currentMacro.chainedMacros = currentMacro.chainedMacros || []
           const { name, args } = parseMacro(token as MacroToken)
           currentMacro.chainedMacros.push({ name, args })
-          macroChainContextText = null
+          macroChainContextToken = null
           break
         }
         flush()
@@ -396,11 +388,12 @@ function parsePassageFlow(tokens: AnyToken[]): PassageFlowNode[] {
 
       case 'text':
       case 'whitespace':
-        if (token.text.trim() === '+' && currentMacro) {
+        if (token.text.trim() === '+' && currentMacro && nextTokenType === 'macro') {
           // Macro chaining context
           // (e.g., (changer1: ...)+(changer2: ...))
-          macroChainContextText = token.text
+          macroChainContextToken = token
         } else {
+          flushMacro()
           textFlowBuffer.push({ type: 'text', content: token.text || '', ...extractPosition(token) })
         }
         break
@@ -408,7 +401,7 @@ function parsePassageFlow(tokens: AnyToken[]): PassageFlowNode[] {
       default:
         // This should never happen for well-formed tokens
         // unless there is an unclosed macro or hook...
-        textFlowBuffer.push({ type: 'text', content: token.text || '' })
+        textFlowBuffer.push({ type: 'text', content: token.text || '', ...extractPosition(token) })
     }
   }
 

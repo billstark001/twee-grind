@@ -3,6 +3,7 @@ export type PrattToken = PrattOperatorToken | PrattExprToken
 export class PrattParseError extends Error {
   start?: number
   end?: number
+  place?: string
   token?: PrattToken
 
   constructor(message: string, token?: PrattToken) {
@@ -21,6 +22,7 @@ export interface PrattOperatorToken {
   type: 'opr'
   start?: number
   end?: number
+  place?: string
   value: string
 }
 
@@ -28,6 +30,7 @@ export interface PrattExprToken {
   type: 'expr'
   start?: number
   end?: number
+  place?: string
   value: any
 }
 
@@ -45,21 +48,25 @@ function defaultLeafNodeCreator(value: any): LeafNode {
   }
 }
 
-export interface PrefixNode<T> {
+interface OperatorNodeMetadata {
+  operator: string
+  start?: number
+  end?: number
+  place?: string
+}
+
+export interface PrefixNode<T> extends OperatorNodeMetadata {
   type: 'prefix'
-  operator: string
   operand: PrattASTNode<T>
 }
 
-export interface PostfixNode<T> {
+export interface PostfixNode<T> extends OperatorNodeMetadata {
   type: 'postfix'
-  operator: string
   operand: PrattASTNode<T>
 }
 
-export interface BinaryNode<T> {
+export interface BinaryNode<T> extends OperatorNodeMetadata {
   type: 'binary'
-  operator: string
   left: PrattASTNode<T>
   right: PrattASTNode<T>
 }
@@ -138,6 +145,9 @@ export class PrattParser<T = LeafNode> {
         const node: PostfixNode<T> = {
           type: 'postfix',
           operator: token.value,
+          start: token.start,
+          end: token.end,
+          place: token.place,
           operand: left
         }
 
@@ -170,6 +180,9 @@ export class PrattParser<T = LeafNode> {
         const node: BinaryNode<T> = {
           type: 'binary',
           operator: token.value,
+          start: token.start,
+          end: token.end,
+          place: token.place,
           left,
           right
         }
@@ -215,6 +228,9 @@ export class PrattParser<T = LeafNode> {
     const node: PrefixNode<T> = {
       type: 'prefix',
       operator: token.value,
+      start: token.start,
+      end: token.end,
+      place: token.place,
       operand
     }
 

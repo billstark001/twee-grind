@@ -243,6 +243,7 @@ export type TypedVarVariable = VariableMetadata & {
 
 export type VariableToValueVariable = VariableMetadata & {
   [HarloweCustomDataType]: 'VariableToValue',
+  datatype?: DatatypeKeyword,
   value: HarloweEngineVariable
 }
 
