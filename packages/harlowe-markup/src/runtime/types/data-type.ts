@@ -1,21 +1,6 @@
-import { CodeHookNode, ExpressionNode, LinkNode } from "../markup/types"
-
-function buildReverseMap<T extends string, U extends string>(
-  map: Readonly<Record<T, U>>
-): Readonly<Record<U, readonly T[]>> {
-  const reverseMap: Record<U, T[]> = {} as Record<U, T[]>
-  for (const [key, value] of Object.entries(map) as [T, U][]) {
-    if (!reverseMap[value]) {
-      reverseMap[value] = []
-    }
-    reverseMap[value].push(key)
-  }
-  for (const key of Object.keys(reverseMap) as U[]) {
-    Object.freeze(reverseMap[key])
-  }
-  Object.freeze(reverseMap)
-  return reverseMap as Readonly<Record<U, readonly T[]>>
-}
+import type { CodeHookNode, ExpressionNode, LinkNode } from "../../markup/types"
+import { buildReverseMap, JsonSerializable } from "../../utils/common"
+import { HarloweEngineScope } from "./engine"
 
 
 export const HarloweCustomDataType = Symbol(`HarloweDataType`)
@@ -34,6 +19,7 @@ export type HarloweEngineVariable =
   | GradientVariable
 
   | BindVariable
+  | DatatypeVariable
   | TypedVarVariable
   | VariableToValueVariable
   | HookNameVariable
@@ -65,11 +51,11 @@ export const allHarloweDataTypes = Object.freeze([
 
   // Harlowe-specific types
   'Colour',
-  'Datatype',
   'Gradient',
 
   // Technical types
   'Bind',
+  'Datatype',
   'TypedVar',
   'VariableToValue',
   'HookName',
@@ -210,7 +196,7 @@ export const allPredefinedColorNames = Object.freeze([
 
 export type PredefinedColorName = typeof allPredefinedColorNames[number];
 
-// Gradient variable type
+// region Gradient variable type
 
 export type GradientStop = {
   percent: number,
@@ -223,8 +209,14 @@ export type GradientVariable = {
   stops: ReadonlyArray<GradientStop>,
 }
 
+// #endregion
 
-// Technical types
+// #region Technical types
+
+export type DatatypeVariable = {
+  [HarloweCustomDataType]: 'Datatype',
+  datatype: DatatypeKeyword,
+}
 
 type VariableMetadata = {
   name: string,
@@ -261,7 +253,9 @@ export type HookNameVariable = HookNameMetadata & {
   visited: HookNameVariable,
 }
 
-// Passage-related types
+// #endregion
+
+// #region Passage-related types
 
 export type ChangerVariable = {
   [HarloweCustomDataType]: 'Changer',
@@ -277,6 +271,10 @@ export type CodeHookVariable = {
 // #endregion
 
 // #region Functional Types
+
+export type FunctionalVariable = {
+  [HarloweScope]: HarloweEngineScope
+}
 
 export type CustomMacroVariable = FunctionalVariable & {
   [HarloweCustomDataType]: 'CustomMacro',
@@ -294,79 +292,6 @@ export type CommandVariable = FunctionalVariable & {
   [HarloweCustomDataType]: 'Command',
   name: string, // pre-defined somewhere else
   data?: JsonSerializable,
-}
-
-
-// #region Runtime Data Types
-
-type JsonSerializable =
-  | null
-  | boolean
-  | number
-  | string
-  | JsonSerializable[]
-  | { [key: string]: JsonSerializable }
-
-export type FunctionalVariable = {
-  [HarloweScope]: HarloweEngineScope
-}
-
-export type HarloweEngineScope = {
-  srcPassage: string | null, // null for global scope
-  srcPos: number, // the index in the source passage where this scope was created, 0 for global scope
-  vars: Map<string, HarloweEngineVariable>,
-  parent?: HarloweEngineScope,
-}
-
-
-// #region Runtime Manager Types 
-// TODO
-
-export const BuiltinChangers = Object.freeze({
-  Naive: Symbol('Naive'), // bold, italic, underline, etc.
-  HtmlTag: Symbol('HtmlTag'),
-  Collapsed: Symbol('Collapsed'),
-  Align: Symbol('Align'),
-  Column: Symbol('Column'),
-  Bulleted: Symbol('Bulleted'),
-  Numbered: Symbol('Numbered'),
-} as const);
-
-
-type StyleAttributes = Record<string, any> // TODO
-type RenderNode = undefined // TODO
-
-export interface StateManager {
-  getGlobal(name: string): any
-  setGlobal(name: string, value: any): void
-  getTemp(name: string): any
-  setTemp(name: string, value: any): void
-  randInt(min: number, max: number): number
-  randFloat(): number // 0-1
-}
-
-export interface ChangerStack {
-  getChangers(): StyleAttributes
-  appendChanger(changer: StyleAttributes): void
-  clear(): void
-}
-
-export interface HooksManager {
-  register(name: string, renderNode: RenderNode): void
-  get(name: string): RenderNode | undefined
-}
-
-export interface NavigationManager {
-  goto(passageName: string): Promise<void>
-  renderPassage(passageName: string): Promise<void> // render in current passage
-  sleep(ms: number): Promise<void>
-
-  getHistory(): string[]
-}
-
-export interface MacroRegistry {
-  call(macroName: string, args: any[]): any
-  has(macroName: string): boolean
 }
 
 // #endregion

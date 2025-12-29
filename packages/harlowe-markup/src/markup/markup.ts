@@ -5,7 +5,7 @@
 import Patterns from './patterns.js'
 import {Lexer,Token,Rule} from './lexer.js'
 import {SetReturnType} from 'type-fest'
-import {IncompleteTokenType,IncompleteToken,AnyToken,TokenType,plainKeywords,plainOperators} from './types.js'
+import {IncompleteTokenType,IncompleteToken,AnyToken,TokenType,plainKeywords,plainOperators} from './types/index.js'
 import {Parser} from './parser.js'
 
 // A basic type utility.

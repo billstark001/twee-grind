@@ -1,4 +1,4 @@
-import { HarloweDataType, HarloweEngineVariable, HarloweCustomDataType, DatatypeKeyword } from "../types"
+import { HarloweDataType, HarloweEngineVariable, HarloweCustomDataType, DatatypeKeyword, LambdaVariable, CustomMacroVariable, DatatypeVariable, CodeHookVariable, GradientVariable, ColorVariable, ChangerVariable, CommandVariable } from "../types"
 
 
 // #region Datatype Validation Functions
@@ -136,56 +136,56 @@ export function isCustomDataType(value: HarloweEngineVariable, type: HarloweData
 /**
  * Check if a value is a Command
  */
-export function isCommand(value: HarloweEngineVariable): boolean {
+export function isCommand(value: HarloweEngineVariable): value is CommandVariable {
   return isCustomDataType(value, 'Command')
 }
 
 /**
  * Check if a value is a Changer
  */
-export function isChanger(value: HarloweEngineVariable): boolean {
+export function isChanger(value: HarloweEngineVariable): value is ChangerVariable {
   return isCustomDataType(value, 'Changer')
 }
 
 /**
  * Check if a value is a Colour
  */
-export function isColour(value: HarloweEngineVariable): boolean {
+export function isColour(value: HarloweEngineVariable): value is ColorVariable {
   return isCustomDataType(value, 'Colour')
 }
 
 /**
  * Check if a value is a Gradient
  */
-export function isGradient(value: HarloweEngineVariable): boolean {
+export function isGradient(value: HarloweEngineVariable): value is GradientVariable {
   return isCustomDataType(value, 'Gradient')
 }
 
 /**
  * Check if a value is a Lambda
  */
-export function isLambda(value: HarloweEngineVariable): boolean {
+export function isLambda(value: HarloweEngineVariable): value is LambdaVariable {
   return isCustomDataType(value, 'Lambda')
 }
 
 /**
  * Check if a value is a CustomMacro
  */
-export function isCustomMacro(value: HarloweEngineVariable): boolean {
+export function isCustomMacro(value: HarloweEngineVariable): value is CustomMacroVariable {
   return isCustomDataType(value, 'CustomMacro')
 }
 
 /**
  * Check if a value is a Datatype
  */
-export function isDatatype(value: HarloweEngineVariable): boolean {
+export function isDatatype(value: HarloweEngineVariable): value is DatatypeVariable {
   return isCustomDataType(value, 'Datatype')
 }
 
 /**
  * Check if a value is a CodeHook
  */
-export function isCodeHook(value: HarloweEngineVariable): boolean {
+export function isCodeHook(value: HarloweEngineVariable): value is CodeHookVariable {
   return isCustomDataType(value, 'CodeHook')
 }
 

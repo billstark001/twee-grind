@@ -8,7 +8,7 @@ import type {
   MacroNode,
   OperatorNode,
   MacroMetadata,
-} from '../markup/types.js'
+} from '../markup/types'
 
 export interface ASTWalkEvent {
   node: HarloweASTNode

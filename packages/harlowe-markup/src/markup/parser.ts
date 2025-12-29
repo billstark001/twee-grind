@@ -17,8 +17,8 @@ import type {
   TextFlowNode,
   UnclosedBuiltinChangerNode,
   ASTPosition,
-} from './types.js'
-import type { PrattExprToken } from '../utils/pratt-parser.js'
+} from './types'
+import type { PrattExprToken } from '../utils/pratt-parser'
 
 /**
  * Extract position information from token
@@ -98,6 +98,14 @@ function convertLeafToken({ value: _token }: PrattExprToken): ExpressionNode {
         throw new ParserError('Failed to parse grouping token', token)
       }
       return ret
+    
+    case 'datatype':
+      return {
+        type: 'literal',
+        dataType: 'datatype',
+        value: token.name,
+        ...extractPosition(token),
+      }
 
     default:
       throw new ParserError(`Unsupported leaf token type in expression: ${token.type}`, token)

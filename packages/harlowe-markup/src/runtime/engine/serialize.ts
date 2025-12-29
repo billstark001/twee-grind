@@ -6,7 +6,7 @@ import {
 } from '../types'
 
 // Serialized scope structure
-type SerializedScope = {
+export type SerializedScope = {
   id: number
   srcPassage: string | null
   srcPos: number
@@ -14,7 +14,7 @@ type SerializedScope = {
   parentId: number | null
 }
 
-type SerializedScopeGraph = {
+export type SerializedScopeGraph = {
   scopes: SerializedScope[]
   rootId: number
 }
@@ -22,6 +22,7 @@ type SerializedScopeGraph = {
 // Symbol string representations
 const SYMBOL_CUSTOM_DATA_TYPE = '__HarloweCustomDataType__'
 const SYMBOL_SCOPE = '__HarloweScope__'
+const SYMBOL_TYPE = '__type__'
 
 /**
  * Serialize a HarloweEngineScope and all its parent scopes into a JSON-serializable structure
@@ -128,7 +129,7 @@ function serializeVariable(
     if (customType !== undefined) {
       serialized[SYMBOL_CUSTOM_DATA_TYPE] = customType
     } else {
-      serialized.__type__ = 'Object'
+      serialized[SYMBOL_TYPE] = 'Object'
     }
 
     // Store scope reference as ID if present
@@ -240,7 +241,7 @@ function deserializeVariable(
     if (value.__type__ === 'Object') {
       const obj: Record<string, any> = {}
       for (const key of Object.keys(value)) {
-        if (key !== '__type__') {
+        if (key !== SYMBOL_TYPE) {
           obj[key] = deserializeVariable(value[key], idToScope)
         }
       }
@@ -264,7 +265,7 @@ function deserializeVariable(
 
     // Restore all other properties
     for (const key of Object.keys(value)) {
-      if (key !== SYMBOL_CUSTOM_DATA_TYPE && key !== SYMBOL_SCOPE && key !== '__type__') {
+      if (key !== SYMBOL_CUSTOM_DATA_TYPE && key !== SYMBOL_SCOPE && key !== SYMBOL_TYPE) {
         result[key] = deserializeVariable(value[key], idToScope)
       }
     }
