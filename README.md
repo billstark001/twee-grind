@@ -8,6 +8,7 @@ This project uses pnpm workspace with 4 packages:
 
 - **harlowe-markup**: Lexer and parser for Harlowe markup (equivalent to harlowe's js/markup directory)
 - **harlowe-lsp**: Language Server Protocol implementation for VSCode and other editors
+- **sugarcast-markup**: Lexer and parser for SugarCast markup (equivalent to SugarCube, but toolchain-ified)
 - **twee-project**: Twee 3 parser with Passage and Story types (similar to klembot/twinejs)
 - **twee-cli**: Command-line tool for various Twee/Twine operations
 
