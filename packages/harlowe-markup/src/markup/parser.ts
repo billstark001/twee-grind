@@ -162,21 +162,24 @@ function parseLink(token: TwineLinkToken): LinkNode {
 }
 
 function handleUnclosedHooks(nodeFlow: PassageFlowNode[]): PassageFlowNode[] {
-  const macroIndicesWithUnclosedHooks: number[] = []
+  const macroIndicesWithUnclosedHooks: [number, boolean][] = []
   for (let i = 0; i < nodeFlow.length; i++) {
     const node = nodeFlow[i]
     if (node.type === 'macro') {
       const macro = node as MacroNode
       if (macro.attachedHook && macro.attachedHook.unclosed) {
-        macroIndicesWithUnclosedHooks.push(i)
+        macroIndicesWithUnclosedHooks.push([i, true])
       }
+    } else if (node.type === 'codeHook' && node.unclosed) {
+      macroIndicesWithUnclosedHooks.push([i, false])
     }
   }
 
-  let i: number | undefined
-  while ((i = macroIndicesWithUnclosedHooks.pop()) !== undefined) {
-    const macro = nodeFlow[i] as MacroNode
-    const unclosedHook = macro.attachedHook as CodeHookNode
+  while (macroIndicesWithUnclosedHooks.length > 0) {
+    const [i, isMacro] = macroIndicesWithUnclosedHooks.pop()!
+    const unclosedHook: CodeHookNode = isMacro
+      ? (nodeFlow[i] as MacroNode).attachedHook as CodeHookNode
+      : (nodeFlow[i] as CodeHookNode)
     const childrenNodes = nodeFlow.splice(i + 1)
     unclosedHook.children.push(...childrenNodes)
   }
