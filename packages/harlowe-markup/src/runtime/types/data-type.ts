@@ -27,10 +27,6 @@ export type HarloweEngineVariable =
 
   | ChangerVariable
   | CodeHookVariable
-  
-  | PatternVariable
-  | RegexDatatypeVariable
-  | MacroAsyncResultVariable
 // #region Custom Data Types
 
 export const allHarloweDataTypes = Object.freeze([
@@ -69,13 +65,6 @@ export const allHarloweDataTypes = Object.freeze([
   // Passage-related types
   'Changer',
   'CodeHook',
-  
-  // Pattern matching types
-  'Pattern',
-  'RegexDatatype',
-  
-  // Macro execution types
-  'MacroAsyncResult',
 ] as const)
 
 export type HarloweDataType = typeof allHarloweDataTypes[number]
@@ -235,6 +224,10 @@ export type ErrorVariable = {
 export type DatatypeVariable = {
   [HarloweCustomDataType]: 'Datatype',
   datatype: DatatypeKeyword,
+  // Extended support for pattern matching
+  patternType?: 'array' | 'datamap' | 'dataset' | 'regex'
+  pattern?: any
+  regex?: RegExp
 }
 
 type VariableMetadata = {
@@ -314,39 +307,4 @@ export type CommandVariable = FunctionalVariable & {
 }
 
 // #endregion
-
-// #region Pattern Matching Types
-
-/**
- * Pattern variable for advanced pattern matching
- */
-export type PatternVariable = {
-  [HarloweCustomDataType]: 'Pattern'
-  patternType: 'array' | 'datamap' | 'dataset' | 'regex' | 'datatype'
-  pattern: any
-}
-
-/**
- * RegexDatatype variable wrapping a RegExp as a Harlowe datatype
- */
-export type RegexDatatypeVariable = {
-  [HarloweCustomDataType]: 'RegexDatatype'
-  regex: RegExp
-}
-
-// #endregion
-
-// #region Macro Execution Types
-
-/**
- * Async/serializable/resumable macro result
- */
-export type MacroAsyncResultVariable = {
-  [HarloweCustomDataType]: 'MacroAsyncResult'
-  asyncId: string
-  asyncType: 'prompt' | 'wait' | 'custom'
-  state: Record<string, any>
-  continuation?: (result: HarloweEngineVariable) => HarloweEngineVariable | void
-}
-
 // #endregion

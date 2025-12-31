@@ -67,3 +67,31 @@ export function invokeLambda(
 
   return result.value
 }
+
+/**
+ * Create a LambdaEvaluator implementation for use in EvaluationContext
+ * This allows eval-macro and other components to invoke lambdas through the context
+ */
+export function createLambdaEvaluator() {
+  return {
+    invokeLambda: (lambda: HarloweEngineVariable, args: HarloweEngineVariable[], context: EvaluationContext) => {
+      if (!isLambda(lambda)) {
+        throw new Error('Value is not a lambda')
+      }
+      return invokeLambda(lambda, args, context)
+    }
+  }
+}
+
+/**
+ * Check if a value is a lambda (re-exported from std/datatype for convenience)
+ */
+function isLambda(value: HarloweEngineVariable): value is LambdaVariable {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    HarloweCustomDataType in value &&
+    value[HarloweCustomDataType] === 'Lambda'
+  )
+}
+

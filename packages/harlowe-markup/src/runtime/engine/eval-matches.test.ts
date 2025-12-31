@@ -5,10 +5,9 @@ import {
   createDatasetPattern,
   createRegexPattern,
   createRegexDatatype,
-  isPattern,
-  isRegexDatatype,
 } from './eval-matches.js'
 import { HarloweCustomDataType } from '../types'
+import { isDatatype } from '../std/datatype'
 
 describe('Advanced Matches Module', () => {
   describe('Array Pattern Matching', () => {
@@ -324,24 +323,26 @@ describe('Advanced Matches Module', () => {
   })
 
   describe('Type Guards', () => {
-    it('should identify Pattern variable', () => {
+    it('should identify Datatype with pattern', () => {
       const pattern = createArrayPattern(['num', 'num'])
-      expect(isPattern(pattern)).toBe(true)
+      expect(isDatatype(pattern)).toBe(true)
+      expect(pattern.patternType).toBe('array')
     })
 
-    it('should identify RegexDatatype variable', () => {
+    it('should identify Datatype with regex', () => {
       const regex = createRegexDatatype(/test/)
-      expect(isRegexDatatype(regex)).toBe(true)
+      expect(isDatatype(regex)).toBe(true)
+      expect(regex.regex).toBeInstanceOf(RegExp)
     })
 
-    it('should not identify regular values as Pattern', () => {
-      expect(isPattern([1, 2, 3])).toBe(false)
-      expect(isPattern('num')).toBe(false)
+    it('should not identify regular values as Datatype', () => {
+      expect(isDatatype([1, 2, 3])).toBe(false)
+      expect(isDatatype('num')).toBe(false)
     })
 
-    it('should not identify regular values as RegexDatatype', () => {
-      expect(isRegexDatatype(/test/)).toBe(false)
-      expect(isRegexDatatype('test')).toBe(false)
+    it('should not identify RegExp as Datatype', () => {
+      expect(isDatatype(/test/)).toBe(false)
+      expect(isDatatype('test')).toBe(false)
     })
   })
 })

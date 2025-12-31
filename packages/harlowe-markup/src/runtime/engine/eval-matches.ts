@@ -2,8 +2,6 @@ import type {
   HarloweEngineVariable,
   DatatypeVariable,
   DatatypeKeyword,
-  PatternVariable,
-  RegexDatatypeVariable,
 } from '../types'
 import { HarloweCustomDataType } from '../types'
 import { matchesDatatype, isDatatype } from '../std/datatype'
@@ -35,13 +33,13 @@ export function advancedMatches(
     return pattern.test(String(value))
   }
 
-  // 2. RegexDatatype matching
-  if (isRegexDatatype(pattern)) {
+  // 2. Datatype with regex matching
+  if (isDatatype(pattern) && pattern.regex) {
     return pattern.regex.test(String(value))
   }
 
-  // 3. Pattern variable matching
-  if (isPattern(pattern)) {
+  // 3. Datatype with pattern matching
+  if (isDatatype(pattern) && pattern.patternType) {
     return matchPattern(value, pattern)
   }
 
@@ -156,9 +154,11 @@ function matchSetPattern(value: Set<any>, pattern: Set<any>): boolean {
 }
 
 /**
- * Match value against a Pattern variable
+ * Match value against a Datatype with pattern
  */
-function matchPattern(value: HarloweEngineVariable, pattern: PatternVariable): boolean {
+function matchPattern(value: HarloweEngineVariable, pattern: DatatypeVariable): boolean {
+  if (!pattern.patternType) return false
+  
   switch (pattern.patternType) {
     case 'array':
       return Array.isArray(value) && matchArrayPattern(value, pattern.pattern)
@@ -168,39 +168,9 @@ function matchPattern(value: HarloweEngineVariable, pattern: PatternVariable): b
       return value instanceof Set && matchSetPattern(value, pattern.pattern)
     case 'regex':
       return pattern.pattern.test(String(value))
-    case 'datatype':
-      return matchesDatatype(value, pattern.pattern)
     default:
       return false
   }
-}
-
-// #endregion
-
-// #region Type Guards
-
-/**
- * Check if value is a Pattern variable
- */
-export function isPattern(value: HarloweEngineVariable): value is PatternVariable {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    HarloweCustomDataType in value &&
-    value[HarloweCustomDataType] === 'Pattern'
-  )
-}
-
-/**
- * Check if value is a RegexDatatype variable
- */
-export function isRegexDatatype(value: HarloweEngineVariable): value is RegexDatatypeVariable {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    HarloweCustomDataType in value &&
-    value[HarloweCustomDataType] === 'RegexDatatype'
-  )
 }
 
 // #endregion
@@ -210,9 +180,10 @@ export function isRegexDatatype(value: HarloweEngineVariable): value is RegexDat
 /**
  * Create an array pattern
  */
-export function createArrayPattern(elements: any[]): PatternVariable {
+export function createArrayPattern(elements: any[]): DatatypeVariable {
   return {
-    [HarloweCustomDataType]: 'Pattern',
+    [HarloweCustomDataType]: 'Datatype',
+    datatype: 'array',
     patternType: 'array',
     pattern: elements,
   }
@@ -221,9 +192,10 @@ export function createArrayPattern(elements: any[]): PatternVariable {
 /**
  * Create a datamap pattern
  */
-export function createDatamapPattern(map: Map<any, any>): PatternVariable {
+export function createDatamapPattern(map: Map<any, any>): DatatypeVariable {
   return {
-    [HarloweCustomDataType]: 'Pattern',
+    [HarloweCustomDataType]: 'Datatype',
+    datatype: 'datamap',
     patternType: 'datamap',
     pattern: map,
   }
@@ -232,9 +204,10 @@ export function createDatamapPattern(map: Map<any, any>): PatternVariable {
 /**
  * Create a dataset pattern
  */
-export function createDatasetPattern(set: Set<any>): PatternVariable {
+export function createDatasetPattern(set: Set<any>): DatatypeVariable {
   return {
-    [HarloweCustomDataType]: 'Pattern',
+    [HarloweCustomDataType]: 'Datatype',
+    datatype: 'dataset',
     patternType: 'dataset',
     pattern: set,
   }
@@ -243,31 +216,22 @@ export function createDatasetPattern(set: Set<any>): PatternVariable {
 /**
  * Create a regex pattern
  */
-export function createRegexPattern(regex: RegExp): PatternVariable {
+export function createRegexPattern(regex: RegExp): DatatypeVariable {
   return {
-    [HarloweCustomDataType]: 'Pattern',
+    [HarloweCustomDataType]: 'Datatype',
+    datatype: 'string',
     patternType: 'regex',
     pattern: regex,
   }
 }
 
 /**
- * Create a datatype pattern
- */
-export function createDatatypePattern(datatype: DatatypeKeyword): PatternVariable {
-  return {
-    [HarloweCustomDataType]: 'Pattern',
-    patternType: 'datatype',
-    pattern: datatype,
-  }
-}
-
-/**
  * Create a RegexDatatype variable
  */
-export function createRegexDatatype(regex: RegExp): RegexDatatypeVariable {
+export function createRegexDatatype(regex: RegExp): DatatypeVariable {
   return {
-    [HarloweCustomDataType]: 'RegexDatatype',
+    [HarloweCustomDataType]: 'Datatype',
+    datatype: 'string',
     regex,
   }
 }
