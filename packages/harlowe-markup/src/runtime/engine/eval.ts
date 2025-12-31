@@ -9,8 +9,7 @@ import type {
   BinaryOperatorNode,
   MacroMetadata,
 } from '../../markup/types'
-import { type HarloweEngineVariable, HarloweCustomDataType, PredefinedColorName, HookNameVariable, EvaluationContext } from '../types'
-import { allPredefinedColors } from '../std/colour'
+import { type HarloweEngineVariable, HookNameVariable, EvaluationContext } from '../types'
 import {
   accessProperty,
   evaluateArithmetic,
@@ -19,6 +18,7 @@ import {
   evaluateMembership,
   evaluateMatching,
   evaluateTypeCheck,
+  evaluateLiteral,
 } from './eval-helpers'
 
 // #region Types and Interfaces
@@ -386,29 +386,6 @@ export function evaluateExpression(
   }
 
   return { success: true, value: state.result! }
-}
-
-/**
- * Evaluate literal node
- */
-function evaluateLiteral(node: LiteralNode): HarloweEngineVariable {
-  switch (node.dataType) {
-    case 'number':
-      return Number(node.value)
-    case 'string':
-      return String(node.value)
-    case 'boolean':
-      return node.value.toLowerCase() === 'true'
-    case 'colour':
-      return allPredefinedColors[node.value.toLowerCase() as any as PredefinedColorName]
-    case 'datatype':
-      return {
-        [HarloweCustomDataType]: 'Datatype',
-        datatype: node.value,
-      }
-    default:
-      throw new Error(`Unknown literal data type: ${node.dataType}`)
-  }
 }
 
 /**

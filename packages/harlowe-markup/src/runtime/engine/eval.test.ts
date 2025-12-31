@@ -15,6 +15,13 @@ import type {
 } from '../../markup/types'
 import type { EvaluationContext, HarloweEngineScope, VariableResolver, MacroEvaluator, HookNameEvaluator } from '../types'
 import { HarloweCustomDataType } from '../types'
+import { Markup } from '../../markup/markup.js'
+
+
+const getExpressions = (code: string): ExpressionNode[] => {
+  const macroNode = Markup.parse(Markup.lex(`(expr: ${code})`)).children[0] as MacroNode;
+  return macroNode.args;
+}
 
 describe('Eval Module', () => {
   // Helper to create a basic evaluation context
@@ -55,11 +62,7 @@ describe('Eval Module', () => {
 
   describe('evaluateExpression - Literals', () => {
     it('should evaluate number literal', () => {
-      const node: LiteralNode = {
-        type: 'literal',
-        dataType: 'number',
-        value: '42',
-      }
+      const [node] = getExpressions('42')
 
       const context = createTestContext()
       const result = evaluateExpression(node, context)
@@ -71,11 +74,19 @@ describe('Eval Module', () => {
     })
 
     it('should evaluate string literal', () => {
-      const node: LiteralNode = {
-        type: 'literal',
-        dataType: 'string',
-        value: 'hello',
+      const [node] = getExpressions('"hello"')
+
+      const context = createTestContext()
+      const result = evaluateExpression(node, context)
+
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.value).toBe('hello')
       }
+    })
+
+    it('should evaluate single-quote string literal', () => {
+      const [node] = getExpressions("'hello'")
 
       const context = createTestContext()
       const result = evaluateExpression(node, context)
@@ -123,11 +134,11 @@ describe('Eval Module', () => {
     it('should evaluate defined variable', () => {
       const node: VariableNode = {
         type: 'variable',
-        name: '$x',
+        name: 'x',
         isTemp: false,
       }
 
-      const context = createTestContext({ '$x': 10 })
+      const context = createTestContext({ 'x': 10 })
       const result = evaluateExpression(node, context)
 
       expect(result.success).toBe(true)
@@ -137,11 +148,7 @@ describe('Eval Module', () => {
     })
 
     it('should fail on undefined variable', () => {
-      const node: VariableNode = {
-        type: 'variable',
-        name: '$undefined',
-        isTemp: false,
-      }
+      const [node] = getExpressions('$undefined')
 
       const context = createTestContext()
       const result = evaluateExpression(node, context)
@@ -153,13 +160,9 @@ describe('Eval Module', () => {
     })
 
     it('should evaluate temp variable', () => {
-      const node: VariableNode = {
-        type: 'variable',
-        name: '_temp',
-        isTemp: true,
-      }
+      const [node] = getExpressions('_temp')
 
-      const context = createTestContext({ '_temp': 'temporary' })
+      const context = createTestContext({ 'temp': 'temporary' })
       const result = evaluateExpression(node, context)
 
       expect(result.success).toBe(true)
@@ -509,11 +512,11 @@ describe('Eval Module', () => {
       const node: BinaryOperatorNode = {
         type: 'binary',
         operator: 'addition',
-        left: { type: 'variable', name: '$x', isTemp: false },
-        right: { type: 'variable', name: '$y', isTemp: false },
+        left: { type: 'variable', name: 'x', isTemp: false },
+        right: { type: 'variable', name: 'y', isTemp: false },
       }
 
-      const context = createTestContext({ '$x': 10, '$y': 20 })
+      const context = createTestContext({ 'x': 10, 'y': 20 })
       const result = evaluateExpression(node, context)
 
       expect(result.success).toBe(true)
@@ -584,11 +587,7 @@ describe('Eval Module', () => {
     })
 
     it('should request macro evaluation when needed', () => {
-      const node: MacroNode = {
-        type: 'macro',
-        name: 'print',
-        args: [{ type: 'literal', dataType: 'string', value: 'hello' }],
-      }
+      const [node] = getExpressions('(print: "Hello")')
 
       const state = createEvaluationState(node)
       const context = createTestContext()
@@ -700,12 +699,7 @@ describe('Eval Module', () => {
     })
 
     it('should handle error in nested expression', () => {
-      const node: BinaryOperatorNode = {
-        type: 'binary',
-        operator: 'addition',
-        left: { type: 'variable', name: '$undefined', isTemp: false },
-        right: { type: 'literal', dataType: 'number', value: '5' },
-      }
+      const [node] = getExpressions('$undefined + 5')
 
       const context = createTestContext()
       const result = evaluateExpression(node, context)

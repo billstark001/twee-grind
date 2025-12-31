@@ -1,5 +1,7 @@
-import type { HarloweEngineVariable, DatatypeKeyword } from '../types'
+import { type HarloweEngineVariable, type DatatypeKeyword, HarloweCustomDataType, PredefinedColorName } from '../types'
 import { isDatatype, matchesDatatype } from '../std/datatype'
+import { LiteralNode } from '../../markup/types';
+import { allPredefinedColors } from '../std/colour';
 
 // #region Property Access 
 
@@ -129,6 +131,140 @@ export function accessProperty(target: HarloweEngineVariable, property: string):
 // #endregion
 
 // #region Operator Evaluators
+
+function parseString(input: string): string {
+  // Check if the string is enclosed in quotes
+  if (input.length < 2) {
+    throw new Error("String must be enclosed in quotes");
+  }
+
+  const firstChar = input[0];
+  const lastChar = input[input.length - 1];
+
+  if ((firstChar !== '"' && firstChar !== "'") || firstChar !== lastChar) {
+    throw new Error("String must be enclosed in matching quotes");
+  }
+
+  // Extract the content between quotes
+  const content = input.slice(1, -1);
+
+  // Process escape sequences
+  let result = "";
+  let i = 0;
+
+  while (i < content.length) {
+    if (content[i] === "\\") {
+      if (i + 1 >= content.length) {
+        throw new Error("Incomplete escape sequence at end of string");
+      }
+
+      const nextChar = content[i + 1];
+
+      switch (nextChar) {
+        case "n":
+          result += "\n";
+          i += 2;
+          break;
+        case "t":
+          result += "\t";
+          i += 2;
+          break;
+        case "b":
+        case "f":
+        case "v":
+        case "r":
+          // Zero-width characters - just skip them
+          i += 2;
+          break;
+        case "\\":
+          result += "\\";
+          i += 2;
+          break;
+        case '"':
+          result += '"';
+          i += 2;
+          break;
+        case "'":
+          result += "'";
+          i += 2;
+          break;
+        case "x":
+          // \xHH - two hexadecimal digits
+          if (i + 3 >= content.length) {
+            throw new Error("Incomplete \\x escape sequence");
+          }
+          const hexX = content.slice(i + 2, i + 4);
+          if (!/^[0-9A-Fa-f]{2}$/.test(hexX)) {
+            throw new Error(`Invalid \\x escape sequence: \\x${hexX}`);
+          }
+          result += String.fromCharCode(parseInt(hexX, 16));
+          i += 4;
+          break;
+        case "u":
+          // \uHHHH or \u{H-HHHHH}
+          if (i + 2 < content.length && content[i + 2] === "{") {
+            // \u{...} format
+            const closeBrace = content.indexOf("}", i + 3);
+            if (closeBrace === -1) {
+              throw new Error("Unclosed \\u{...} escape sequence");
+            }
+            const hexU = content.slice(i + 3, closeBrace);
+            if (!/^[0-9A-Fa-f]{1,5}$/.test(hexU)) {
+              throw new Error(`Invalid \\u{} escape sequence: \\u{${hexU}}`);
+            }
+            const codePoint = parseInt(hexU, 16);
+            result += String.fromCodePoint(codePoint);
+            i = closeBrace + 1;
+          } else {
+            // \uHHHH format
+            if (i + 5 >= content.length) {
+              throw new Error("Incomplete \\u escape sequence");
+            }
+            const hexU = content.slice(i + 2, i + 6);
+            if (!/^[0-9A-Fa-f]{4}$/.test(hexU)) {
+              throw new Error(`Invalid \\u escape sequence: \\u${hexU}`);
+            }
+            result += String.fromCharCode(parseInt(hexU, 16));
+            i += 6;
+          }
+          break;
+        default:
+          // Unknown escape sequence - treat as literal
+          result += nextChar;
+          i += 2;
+          break;
+      }
+    } else {
+      result += content[i];
+      i++;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Evaluate literal node
+ */
+export function evaluateLiteral(node: LiteralNode): HarloweEngineVariable {
+  switch (node.dataType) {
+    case 'number':
+      return Number(node.value)
+    case 'string':
+      return parseString(node.value)
+    case 'boolean':
+      return node.value.toLowerCase() === 'true'
+    case 'colour':
+      return allPredefinedColors[node.value.toLowerCase() as any as PredefinedColorName]
+    case 'datatype':
+      return {
+        [HarloweCustomDataType]: 'Datatype',
+        datatype: node.value,
+      }
+    default:
+      throw new Error(`Unknown literal data type: ${node.dataType}`)
+  }
+}
 
 /**
  * Evaluate arithmetic operators

@@ -3,11 +3,9 @@ import type {
   ExpressionNode,
   CodeHookNode,
   TextFlowNode,
-  PassageTextFlowNode,
   BuiltinChangerNode,
   MacroNode,
   OperatorNode,
-  MacroMetadata,
 } from '../markup/types'
 
 export interface ASTWalkEvent {
@@ -20,102 +18,240 @@ export interface ASTWalkEvent {
 export type ASTVisitor = (event: ASTWalkEvent) => void | boolean
 
 /**
- * Walk through a Harlowe AST tree in depth-first order
+ * Serialized state of an AST walker
+ */
+export interface WalkerState {
+  stack: Array<{
+    node: HarloweASTNode
+    parent?: HarloweASTNode
+    index?: number
+    phase: 'enter' | 'children' | 'exit'
+    childIndex: number
+  }>
+}
+
+/**
+ * Walk through a Harlowe AST tree in depth-first order with step-by-step execution
  */
 export class ASTWalker {
   private visitor: ASTVisitor
+  private stack: Array<{
+    node: HarloweASTNode
+    parent?: HarloweASTNode
+    index?: number
+    phase: 'enter' | 'children' | 'exit'
+    childIndex: number
+  }> = []
+  private completed = false
+  private skipNodeTypes: Set<string>
 
-  constructor(visitor: ASTVisitor) {
+  constructor(
+    visitor: ASTVisitor,
+    options?: {
+      initialState?: WalkerState
+      skipNodeTypes?: string[]
+    }
+  ) {
     this.visitor = visitor
+    this.skipNodeTypes = new Set(options?.skipNodeTypes ?? [])
+    if (options?.initialState) {
+      this.stack = options.initialState.stack
+    }
   }
 
   /**
-   * Walk a single node and its descendants
+   * Initialize the walker with a root node
    */
-  walk(node: HarloweASTNode, parent?: HarloweASTNode, index?: number): boolean {
-    // Enter node
-    const continueEnter = this.visitor({ node, entering: true, parent, index })
-    if (continueEnter === false) {
+  start(node: HarloweASTNode, parent?: HarloweASTNode, index?: number): void {
+    if (this.stack.length === 0) {
+      this.stack.push({
+        node,
+        parent,
+        index,
+        phase: 'enter',
+        childIndex: 0,
+      })
+    }
+  }
+
+  /**
+   * Execute one step of the walk
+   * Returns true if there are more steps, false if completed
+   */
+  step(): boolean {
+    if (this.completed || this.stack.length === 0) {
+      this.completed = true
       return false
     }
 
-    // Visit children
-    this.visitChildren(node)
+    const frame = this.stack[this.stack.length - 1]
 
-    // Exit node
-    const continueExit = this.visitor({ node, entering: false, parent, index })
-    return continueExit !== false
+    switch (frame.phase) {
+      case 'enter': {
+        const continueEnter = this.visitor({
+          node: frame.node,
+          entering: true,
+          parent: frame.parent,
+          index: frame.index,
+        })
+
+        if (continueEnter === false) {
+          // Skip this subtree entirely
+          this.stack.pop()
+          return this.stack.length > 0
+        }
+
+        // Check if this node type should be skipped
+        if (this.skipNodeTypes.has(frame.node.type)) {
+          // Skip to exit phase without visiting children
+          frame.phase = 'exit'
+          return true
+        }
+
+        frame.phase = 'children'
+        return true
+      }
+
+      case 'children': {
+        const children = this.getChildren(frame.node)
+
+        if (frame.childIndex < children.length) {
+          const child = children[frame.childIndex]
+          frame.childIndex++
+
+          this.stack.push({
+            node: child.node,
+            parent: frame.node,
+            index: child.index,
+            phase: 'enter',
+            childIndex: 0,
+          })
+          return true
+        }
+
+        frame.phase = 'exit'
+        return true
+      }
+
+      case 'exit': {
+        const continueExit = this.visitor({
+          node: frame.node,
+          entering: false,
+          parent: frame.parent,
+          index: frame.index,
+        })
+
+        this.stack.pop()
+
+        if (continueExit === false) {
+          // Stop entire traversal
+          this.stack = []
+          this.completed = true
+          return false
+        }
+
+        return this.stack.length > 0
+      }
+    }
   }
 
-  private visitChildren(node: HarloweASTNode): void {
+  /**
+   * Walk the entire tree to completion
+   */
+  walk(node: HarloweASTNode, parent?: HarloweASTNode, index?: number): boolean {
+    this.start(node, parent, index)
+
+    while (this.step()) {
+      // Continue until completion
+    }
+
+    return !this.completed || this.stack.length === 0
+  }
+
+  /**
+   * Check if the walk is completed
+   */
+  isCompleted(): boolean {
+    return this.completed || this.stack.length === 0
+  }
+
+  /**
+   * Serialize the current walker state
+   */
+  serialize(): WalkerState {
+    return {
+      stack: this.stack.map(frame => ({ ...frame })),
+    }
+  }
+
+  /**
+   * Get children of a node
+   */
+  private getChildren(node: HarloweASTNode): Array<{ node: HarloweASTNode; index?: number }> {
+    const children: Array<{ node: HarloweASTNode; index?: number }> = []
+
     switch (node.type) {
       case 'codeHook':
       case 'builtinChanger':
-        this.walkArray((node as CodeHookNode | BuiltinChangerNode).children, node)
+        (node as CodeHookNode | BuiltinChangerNode).children.forEach((child, i) => {
+          children.push({ node: child, index: i })
+        })
         break
 
       case 'textFlow':
-        this.walkTextFlowChildren((node as TextFlowNode).children, node)
+        (node as TextFlowNode).children.forEach((child, i) => {
+          children.push({ node: child as HarloweASTNode, index: i })
+        })
         break
 
       case 'macro':
         const macro = node as MacroNode
-        this.walkArray(macro.args, node)
+        macro.args.forEach((arg, i) => {
+          children.push({ node: arg, index: i })
+        })
         if (macro.chainedMacros) {
-          for (const chained of macro.chainedMacros) {
-            this.walkArray(chained.args, node)
-          }
+          macro.chainedMacros.forEach((chained, i) => {
+            chained.args.forEach((arg, j) => {
+              children.push({ node: arg, index: j })
+            })
+          })
         }
         if (macro.attachedHook) {
-          this.walk(macro.attachedHook, node)
+          children.push({ node: macro.attachedHook })
         }
         break
 
       case 'binary':
         const binary = node as OperatorNode & { type: 'binary' }
-        this.walk(binary.left, node)
-        this.walk(binary.right, node)
+        children.push({ node: binary.left })
+        children.push({ node: binary.right })
         break
 
       case 'prefix':
       case 'postfix':
         const unary = node as OperatorNode & { type: 'prefix' | 'postfix' }
-        this.walk(unary.operand, node)
+        children.push({ node: unary.operand })
         break
 
-      // Leaf nodes with no children
       case 'text':
       case 'textElement':
       case 'link':
       case 'variable':
       case 'rawVariable':
       case 'literal':
+        // Leaf nodes
         break
 
       default:
-        // Unknown node type - attempt to walk children if they exist
+        // Unknown node type - attempt to get children if they exist
         if ('children' in node && Array.isArray((node as any).children)) {
-          this.walkArray((node as any).children, node)
+          (node as any).children.forEach((child: HarloweASTNode, i: number) => {
+            children.push({ node: child, index: i })
+          })
         }
     }
-  }
 
-  private walkArray(nodes: HarloweASTNode[], parent: HarloweASTNode): void {
-    for (let i = 0; i < nodes.length; i++) {
-      const shouldContinue = this.walk(nodes[i], parent, i)
-      if (!shouldContinue) {
-        break
-      }
-    }
-  }
-
-  private walkTextFlowChildren(nodes: PassageTextFlowNode[], parent: HarloweASTNode): void {
-    for (let i = 0; i < nodes.length; i++) {
-      const shouldContinue = this.walk(nodes[i] as HarloweASTNode, parent, i)
-      if (!shouldContinue) {
-        break
-      }
-    }
+    return children
   }
 }
 
@@ -124,9 +260,10 @@ export class ASTWalker {
  */
 export function walkAST(
   node: HarloweASTNode,
-  visitor: ASTVisitor
+  visitor: ASTVisitor,
+  options?: { skipNodeTypes?: string[] }
 ): void {
-  const walker = new ASTWalker(visitor)
+  const walker = new ASTWalker(visitor, options)
   walker.walk(node)
 }
 
@@ -136,76 +273,24 @@ export function walkAST(
 export function* traverseAST(
   node: HarloweASTNode,
   parent?: HarloweASTNode,
-  index?: number
+  index?: number,
+  options?: { skipNodeTypes?: string[] }
 ): Generator<ASTWalkEvent, void, unknown> {
-  yield { node, entering: true, parent, index }
+  const events: ASTWalkEvent[] = []
 
-  // Visit children based on node type
-  switch (node.type) {
-    case 'codeHook':
-    case 'builtinChanger':
-      yield* traverseArrayNodes((node as CodeHookNode | BuiltinChangerNode).children, node)
-      break
+  const walker = new ASTWalker((event) => {
+    events.push(event)
+  }, options)
 
-    case 'textFlow':
-      yield* traverseTextFlowChildren((node as TextFlowNode).children, node)
-      break
+  walker.start(node, parent, index)
 
-    case 'macro':
-      const macro = node as MacroNode
-      yield* traverseArrayNodes(macro.args, node)
-      if (macro.chainedMacros) {
-        for (const chained of macro.chainedMacros) {
-          yield* traverseChainedMacro(chained, node, index)
-        }
-      }
-      if (macro.attachedHook) {
-        yield* traverseAST(macro.attachedHook, node)
-      }
-      break
+  while (!walker.isCompleted()) {
+    walker.step()
 
-    case 'binary':
-      const binary = node as OperatorNode & { type: 'binary' }
-      yield* traverseAST(binary.left, node)
-      yield* traverseAST(binary.right, node)
-      break
-
-    case 'prefix':
-    case 'postfix':
-      const unary = node as OperatorNode & { type: 'prefix' | 'postfix' }
-      yield* traverseAST(unary.operand, node)
-      break
-  }
-
-  yield { node, entering: false, parent, index }
-}
-
-function* traverseChainedMacro(
-  chained: MacroMetadata,
-  parent: HarloweASTNode,
-  index?: number
-): Generator<ASTWalkEvent, void, unknown> {
-  const node: HarloweASTNode = { type: 'macro', ...chained };
-  yield { node, entering: true, parent, index }
-  yield* traverseArrayNodes(chained.args, parent)
-  yield { node, entering: false, parent, index }
-}
-
-function* traverseArrayNodes(
-  nodes: HarloweASTNode[],
-  parent: HarloweASTNode
-): Generator<ASTWalkEvent, void, unknown> {
-  for (let i = 0; i < nodes.length; i++) {
-    yield* traverseAST(nodes[i], parent, i)
-  }
-}
-
-function* traverseTextFlowChildren(
-  nodes: PassageTextFlowNode[],
-  parent: HarloweASTNode
-): Generator<ASTWalkEvent, void, unknown> {
-  for (let i = 0; i < nodes.length; i++) {
-    yield* traverseAST(nodes[i] as HarloweASTNode, parent, i)
+    // Yield all collected events
+    while (events.length > 0) {
+      yield events.shift()!
+    }
   }
 }
 
@@ -214,14 +299,15 @@ function* traverseTextFlowChildren(
  */
 export function collectNodes(
   root: HarloweASTNode,
-  predicate: (node: HarloweASTNode) => boolean
+  predicate: (node: HarloweASTNode) => boolean,
+  options?: { skipNodeTypes?: string[] }
 ): HarloweASTNode[] {
   const collected: HarloweASTNode[] = []
   walkAST(root, ({ node, entering }) => {
     if (entering && predicate(node)) {
       collected.push(node)
     }
-  })
+  }, options)
   return collected
 }
 
@@ -230,7 +316,8 @@ export function collectNodes(
  */
 export function findNode(
   root: HarloweASTNode,
-  predicate: (node: HarloweASTNode) => boolean
+  predicate: (node: HarloweASTNode) => boolean,
+  options?: { skipNodeTypes?: string[] }
 ): HarloweASTNode | undefined {
   let found: HarloweASTNode | undefined
   walkAST(root, ({ node, entering }) => {
@@ -238,7 +325,7 @@ export function findNode(
       found = node
       return false // Stop traversal
     }
-  })
+  }, options)
   return found
 }
 

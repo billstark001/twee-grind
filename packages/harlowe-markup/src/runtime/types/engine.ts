@@ -25,20 +25,6 @@ export interface VariableResolver {
 }
 
 /**
- * External dependency for macro evaluation
- * Macros can be interruptible (e.g., require user input)
- */
-export interface MacroEvaluator {
-  /**
-   * Evaluate a macro call
-   * @param macro Macro metadata including name and arguments
-   * @param scope Current scope
-   * @returns Promise that resolves to macro result
-   */
-  evaluateMacro(macro: MacroMetadata, scope: HarloweEngineScope): Promise<HarloweEngineVariable>
-}
-
-/**
  * External dependency for hook name evaluation
  */
 export interface HookNameEvaluator {
@@ -75,6 +61,66 @@ export interface EvaluationContext {
   hookNameEvaluator: HookNameEvaluator
 }
 
+
+/**
+ * External dependency for macro evaluation
+ * Macros can be interruptible (e.g., require user input)
+ */
+export interface MacroEvaluator {
+  /**
+   * Evaluate a macro call
+   * @param macro Macro metadata including name and arguments
+   * @param scope Current scope
+   * @returns Promise that resolves to macro result
+   */
+  evaluateMacro(macro: MacroMetadata, scope: HarloweEngineScope): Promise<HarloweEngineVariable>
+}
+
+export interface GetCursorOptions<TCursor> {
+  type: 'hookName' | 'string'
+  range: TCursor
+}
+
+
+/**
+ * Renderer interface for passage flow
+ * Used to build the final output from passage content
+ * 
+ * e.g. 
+ * 
+ * (enchant: ?bold, (text-style: "bold")) would call
+ *   - pushCursor("bold", "hookName")
+ *   - applyChanger("custom", { attrs: { style: "font-weight: bold;" } })
+ *   - popCursor()
+ * 
+ * [[Next->PassageName]] would call
+ *   - pushLink("Next", "PassageName")
+ */
+export interface PassageFlowRenderer<TChangerArgs = any, TCursor = any> {
+  pushText(text: string): void
+  pushTextElement(element: string): void // br, hr, etc.
+  pushLink(text: string, passage: string): void
+
+  enterHook(hookName: string): TCursor
+  exitHook(): void
+
+  enterTag(name: string, attrs: Record<string, string>, children?: string): void
+  exitTag(name: string): void
+
+  enterChanger(name: string, args?: TChangerArgs): void
+  exitChanger(name: string): void
+
+  applyChanger(name: string, args?: TChangerArgs): void
+
+  pushCursor(value: string, options: GetCursorOptions<TCursor>): void
+  popCursor(): void
+  getCursor(value: string, options: GetCursorOptions<TCursor>): TCursor
+}
+
 export interface ExecutionContext extends EvaluationContext {
   macroEvaluator: MacroEvaluator
+  passageRenderer: PassageFlowRenderer<any, any>
 }
+
+
+
