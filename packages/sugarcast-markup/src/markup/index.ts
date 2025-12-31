@@ -255,6 +255,24 @@ function splitBranches(children: PassageFlowNode[], branchType: 'if' | 'switch')
   const branches: MacroBranch[] = [];
   let currentBranch: MacroBranch | null = null;
   
+  // Helper to create initial branch if needed
+  const ensureBranch = () => {
+    if (!currentBranch) {
+      if (branchType === 'if') {
+        // For if statements, always create a branch for initial content
+        currentBranch = {
+          type: 'macroBranch',
+          branchType: 'main',
+          children: [],
+          start: 0,
+          end: 0,
+        };
+      }
+      // For switch statements, return false to skip content before first case
+    }
+    return !!currentBranch;
+  };
+  
   for (const child of children) {
     if (child.type === 'macro') {
       const macro = child as MacroNode;
@@ -311,43 +329,15 @@ function splitBranches(children: PassageFlowNode[], branchType: 'if' | 'switch')
         };
       } else {
         // Regular child - add to current branch
-        if (!currentBranch) {
-          // Create a default branch only if needed
-          if (branchType === 'if') {
-            // For if statements, always create a branch for initial content
-            currentBranch = {
-              type: 'macroBranch',
-              branchType: 'main',
-              children: [],
-              start: 0,
-              end: 0,
-            };
-          } else {
-            // For switch statements, skip content before first case
-            continue;
-          }
+        if (ensureBranch()) {
+          currentBranch!.children.push(child);
         }
-        currentBranch.children.push(child);
       }
     } else {
       // Non-macro child - add to current branch
-      if (!currentBranch) {
-        // Create a default branch only if needed
-        if (branchType === 'if') {
-          // For if statements, always create a branch for initial content
-          currentBranch = {
-            type: 'macroBranch',
-            branchType: 'main',
-            children: [],
-            start: 0,
-            end: 0,
-          };
-        } else {
-          // For switch statements, skip content before first case
-          continue;
-        }
+      if (ensureBranch()) {
+        currentBranch!.children.push(child);
       }
-      currentBranch.children.push(child);
     }
   }
   
@@ -429,8 +419,8 @@ function pairMacros(nodes: PassageFlowNode[]): PassageFlowNode[] {
             start: macro.start,
             end: macro.end,
           };
-          // Store switch condition separately
-          (container as any).switchCondition = macro.args;
+          // Store switch condition
+          container.switchCondition = macro.args;
           if (stack.length > 0) {
             const top = stack[stack.length - 1];
             const currentBranch = top.container.branches[top.container.branches.length - 1];

@@ -147,6 +147,7 @@ export interface MacroContainerNode extends ASTPosition {
   type: 'macroContainer';
   containerType: 'if' | 'switch' | 'for' | 'while' | 'widget' | 'generic';
   branches: MacroBranch[];
+  switchCondition?: MacroArgument[]; // For switch statements
 }
 
 // A branch in a conditional or switch structure
