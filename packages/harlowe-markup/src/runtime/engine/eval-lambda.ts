@@ -68,14 +68,4 @@ export function invokeLambda(
   return result.value
 }
 
-/**
- * Check if a value is a lambda
- */
-export function isLambda(value: HarloweEngineVariable): value is LambdaVariable {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    HarloweCustomDataType in value &&
-    value[HarloweCustomDataType] === 'Lambda'
-  )
-}
+// Note: isLambda is available from '../std/datatype' and should be imported from there if needed

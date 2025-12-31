@@ -2,33 +2,12 @@ import type {
   HarloweEngineVariable,
   DatatypeVariable,
   DatatypeKeyword,
+  PatternVariable,
+  RegexDatatypeVariable,
 } from '../types'
 import { HarloweCustomDataType } from '../types'
-import { matchesDatatype } from '../std/datatype'
+import { matchesDatatype, isDatatype } from '../std/datatype'
 import { deepEqual } from './eval-helpers'
-
-// #region Pattern Type Definitions
-
-/**
- * Pattern variable type for advanced pattern matching
- * Represents patterns like (p: ...) or (pattern: ...)
- */
-export interface PatternVariable {
-  [HarloweCustomDataType]: 'Pattern'
-  patternType: 'array' | 'datamap' | 'dataset' | 'regex' | 'datatype'
-  pattern: any // The actual pattern definition
-}
-
-/**
- * Regex pattern variable type
- * Wraps RegExp as a Harlowe datatype
- */
-export interface RegexDatatypeVariable {
-  [HarloweCustomDataType]: 'RegexDatatype'
-  regex: RegExp
-}
-
-// #endregion
 
 // #region Pattern Matching Core
 
@@ -224,17 +203,7 @@ export function isRegexDatatype(value: HarloweEngineVariable): value is RegexDat
   )
 }
 
-/**
- * Check if value is a Datatype variable
- */
-export function isDatatype(value: HarloweEngineVariable): value is DatatypeVariable {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    HarloweCustomDataType in value &&
-    value[HarloweCustomDataType] === 'Datatype'
-  )
-}
+// Note: isDatatype is imported from '../std/datatype'
 
 // #endregion
 
