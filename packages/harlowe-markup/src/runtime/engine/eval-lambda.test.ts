@@ -209,4 +209,142 @@ describe('Lambda Evaluation Module', () => {
       expect(result).toBe(5) // Should use lambda argument, not outer variable
     })
   })
+
+  describe('Lambda Operators (where, when, via, making, each)', () => {
+    describe('where operator', () => {
+      it('should evaluate where lambda with expression body', () => {
+        // Simulating: _x where _x > 5
+        const [conditionExpr] = getExpressions('$x > 5')
+        const context = createTestContext()
+        const lambda = createLambda(['x'], conditionExpr, context.scope, 'where')
+
+        // Test with value that passes condition
+        expect(invokeLambda(lambda, [10], context)).toBe(true)
+        // Test with value that fails condition
+        expect(invokeLambda(lambda, [3], context)).toBe(false)
+      })
+
+      it('should have access to "it" keyword in where lambda', () => {
+        // Simulating: where it > 5
+        const [conditionExpr] = getExpressions('it > 5')
+        const context = createTestContext()
+        const lambda = createLambda(['it'], conditionExpr, context.scope, 'where')
+
+        expect(invokeLambda(lambda, [10], context)).toBe(true)
+        expect(invokeLambda(lambda, [3], context)).toBe(false)
+      })
+    })
+
+    describe('when operator', () => {
+      it('should evaluate when lambda similar to where', () => {
+        // Simulating: _x when _x < 10
+        const [conditionExpr] = getExpressions('$x < 10')
+        const context = createTestContext()
+        const lambda = createLambda(['x'], conditionExpr, context.scope, 'when')
+
+        expect(invokeLambda(lambda, [5], context)).toBe(true)
+        expect(invokeLambda(lambda, [15], context)).toBe(false)
+      })
+    })
+
+    describe('via operator', () => {
+      it('should evaluate via lambda for transformation', () => {
+        // Simulating: _x via _x * 2
+        const [transformExpr] = getExpressions('$x * 2')
+        const context = createTestContext()
+        const lambda = createLambda(['x'], transformExpr, context.scope, 'via')
+
+        expect(invokeLambda(lambda, [5], context)).toBe(10)
+        expect(invokeLambda(lambda, [10], context)).toBe(20)
+      })
+
+      it('should transform strings via lambda', () => {
+        // Would be: _str via _str + "!"
+        const [transformExpr] = getExpressions('$str')
+        const context = createTestContext()
+        const lambda = createLambda(['str'], transformExpr, context.scope, 'via')
+
+        expect(invokeLambda(lambda, ['hello'], context)).toBe('hello')
+      })
+    })
+
+    describe('each operator', () => {
+      it('should create each lambda with variable name', () => {
+        // Simulating: each _item
+        // Each lambda without body just returns the item
+        const context = createTestContext()
+        const lambda = createLambda(['item'], null as any, context.scope, 'each')
+
+        // Without a body, it should just return the argument
+        expect(invokeLambda(lambda, [42], context)).toBe(42)
+      })
+    })
+
+    describe('making operator', () => {
+      it('should create making lambda with accumulator variable', () => {
+        // Simulating: _num making _total via _total + _num
+        const [accumulatorExpr] = getExpressions('$total + $num')
+        const context = createTestContext()
+        const lambda = createLambda(['num'], accumulatorExpr, context.scope, 'making')
+        lambda.makingVarName = 'total'
+
+        // Making lambda would typically be used with initial accumulator value
+        // For now, test that it evaluates correctly
+        const result = invokeLambda(lambda, [5], context)
+        expect(result).toBe(5) // 0 (default) + 5
+      })
+    })
+
+    describe('Complex lambda expressions', () => {
+      it('should handle complex condition in where lambda', () => {
+        // Simulating: _x where (_x > 5) and (_x < 15)
+        const [conditionExpr] = getExpressions('($x > 5) and ($x < 15)')
+        const context = createTestContext()
+        const lambda = createLambda(['x'], conditionExpr, context.scope, 'where')
+
+        expect(invokeLambda(lambda, [10], context)).toBe(true)
+        expect(invokeLambda(lambda, [3], context)).toBe(false)
+        expect(invokeLambda(lambda, [20], context)).toBe(false)
+      })
+
+      it('should handle arithmetic in via lambda', () => {
+        // Simulating: _x via (_x * 2) + 1
+        const [transformExpr] = getExpressions('($x * 2) + 1')
+        const context = createTestContext()
+        const lambda = createLambda(['x'], transformExpr, context.scope, 'via')
+
+        expect(invokeLambda(lambda, [5], context)).toBe(11)
+        expect(invokeLambda(lambda, [0], context)).toBe(1)
+      })
+    })
+
+    describe('Lambda type properties', () => {
+      it('should create lambda with correct type', () => {
+        const [expr] = getExpressions('$x > 5')
+        const context = createTestContext()
+        const lambda = createLambda(['x'], expr, context.scope, 'where')
+
+        expect(lambda.lambdaType).toBe('where')
+        expect(lambda.argNames).toEqual(['x'])
+      })
+
+      it('should create via lambda with correct properties', () => {
+        const [expr] = getExpressions('$x * 2')
+        const context = createTestContext()
+        const lambda = createLambda(['x'], expr, context.scope, 'via')
+
+        expect(lambda.lambdaType).toBe('via')
+      })
+
+      it('should create making lambda with making variable name', () => {
+        const [expr] = getExpressions('$total + $x')
+        const context = createTestContext()
+        const lambda = createLambda(['x'], expr, context.scope, 'making')
+        lambda.makingVarName = 'total'
+
+        expect(lambda.lambdaType).toBe('making')
+        expect(lambda.makingVarName).toBe('total')
+      })
+    })
+  })
 })

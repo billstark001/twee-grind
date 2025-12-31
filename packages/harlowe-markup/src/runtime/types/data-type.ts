@@ -296,8 +296,12 @@ export type CustomMacroVariable = FunctionalVariable & {
 
 export type LambdaVariable = FunctionalVariable & {
   [HarloweCustomDataType]: 'Lambda',
+  // Lambda type: where/when = filter, via = transform, making = accumulator, each = iterator
+  lambdaType?: 'where' | 'when' | 'via' | 'making' | 'each'
   argNames: string[],
   body: ExpressionNode,
+  // For 'making' lambdas: the making variable name
+  makingVarName?: string
 }
 
 export type CommandVariable = FunctionalVariable & {

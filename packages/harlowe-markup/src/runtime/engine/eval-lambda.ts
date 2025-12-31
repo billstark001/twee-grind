@@ -8,15 +8,18 @@ import { evaluateExpression } from './eval'
  * @param argNames Array of argument names
  * @param body Expression node representing the function body
  * @param scope Scope where the lambda was created (closure)
+ * @param lambdaType Optional lambda type (where, when, via, making, each)
  */
 export function createLambda(
   argNames: string[],
   body: ExpressionNode,
-  scope: HarloweEngineScope
+  scope: HarloweEngineScope,
+  lambdaType?: 'where' | 'when' | 'via' | 'making' | 'each'
 ): LambdaVariable {
   return {
     [HarloweCustomDataType]: 'Lambda',
     [HarloweScope]: scope,
+    lambdaType,
     argNames,
     body,
   }
@@ -24,6 +27,7 @@ export function createLambda(
 
 /**
  * Invoke a lambda function with arguments
+ * Handles different lambda types: where, when, via, making, each
  * @param lambda Lambda variable to invoke
  * @param args Arguments to pass to the lambda
  * @param context Evaluation context
@@ -41,10 +45,19 @@ export function invokeLambda(
     )
   }
 
+  // Handle lambdas without body (each without via)
+  if (!lambda.body) {
+    // For 'each' lambdas without a body, just return the argument
+    if (lambda.lambdaType === 'each') {
+      return args[0]
+    }
+    throw new Error('Lambda has no body expression')
+  }
+
   // Create new scope for lambda execution
   const lambdaScope: HarloweEngineScope = {
-    srcPassage: lambda[HarloweScope].srcPassage,
-    srcPos: lambda[HarloweScope].srcPos,
+    srcPassage: lambda[HarloweScope]?.srcPassage || null,
+    srcPos: lambda[HarloweScope]?.srcPos || 0,
     vars: new Map(),
     parent: lambda[HarloweScope], // Closure: parent is creation scope
   }
@@ -53,11 +66,23 @@ export function invokeLambda(
   for (let i = 0; i < lambda.argNames.length; i++) {
     lambdaScope.vars.set(lambda.argNames[i], args[i])
   }
+  
+  // For making lambdas, also bind the making variable if specified
+  if (lambda.lambdaType === 'making' && lambda.makingVarName) {
+    // Making variable is initialized to appropriate empty value
+    // This would typically be provided by the macro using the lambda
+    lambdaScope.vars.set(lambda.makingVarName, 0) // Default to 0, or passed from context
+  }
 
   // Evaluate lambda body in new scope
+  // For where/when lambdas, also set 'it' to the argument
   const lambdaContext: EvaluationContext = {
     ...context,
     scope: lambdaScope,
+    reserved: {
+      ...context.reserved,
+      it: args[0], // 'it' refers to the current item
+    }
   }
 
   const result = evaluateExpression(lambda.body, lambdaContext)
