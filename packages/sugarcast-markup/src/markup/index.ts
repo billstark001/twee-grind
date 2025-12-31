@@ -312,7 +312,29 @@ function splitBranches(children: PassageFlowNode[], branchType: 'if' | 'switch')
       } else {
         // Regular child - add to current branch
         if (!currentBranch) {
-          // Should not happen, but create a default branch
+          // Create a default branch only if needed
+          if (branchType === 'if') {
+            // For if statements, always create a branch for initial content
+            currentBranch = {
+              type: 'macroBranch',
+              branchType: 'main',
+              children: [],
+              start: 0,
+              end: 0,
+            };
+          } else {
+            // For switch statements, skip content before first case
+            continue;
+          }
+        }
+        currentBranch.children.push(child);
+      }
+    } else {
+      // Non-macro child - add to current branch
+      if (!currentBranch) {
+        // Create a default branch only if needed
+        if (branchType === 'if') {
+          // For if statements, always create a branch for initial content
           currentBranch = {
             type: 'macroBranch',
             branchType: 'main',
@@ -320,20 +342,10 @@ function splitBranches(children: PassageFlowNode[], branchType: 'if' | 'switch')
             start: 0,
             end: 0,
           };
+        } else {
+          // For switch statements, skip content before first case
+          continue;
         }
-        currentBranch.children.push(child);
-      }
-    } else {
-      // Non-macro child - add to current branch
-      if (!currentBranch) {
-        // Should not happen, but create a default branch
-        currentBranch = {
-          type: 'macroBranch',
-          branchType: 'main',
-          children: [],
-          start: 0,
-          end: 0,
-        };
       }
       currentBranch.children.push(child);
     }
@@ -371,11 +383,106 @@ function pairMacros(nodes: PassageFlowNode[]): PassageFlowNode[] {
 
     const macro = node as MacroNode;
 
-    // Recursively process macro children first
+    // First check if macro has children - if so, handle it as a self-contained structure
     if (macro.children && macro.children.length > 0) {
-      macro.children = pairMacros(macro.children);
+      // Macro has children - check if it should be a container
+      const shouldBeContainer = ['if', 'while', 'for', 'widget', 'switch'].includes(macro.name);
+      
+      if (shouldBeContainer) {
+        if (macro.name === 'if') {
+          // Split children by elseif/else branches BEFORE recursive processing
+          const branches = splitBranches(macro.children, 'if');
+          // Update the first branch to be 'if' type with the macro's condition
+          if (branches.length > 0) {
+            branches[0].branchType = 'if';
+            branches[0].condition = macro.args;
+          }
+          // Recursively process each branch's children
+          for (const branch of branches) {
+            branch.children = pairMacros(branch.children);
+          }
+          const container: MacroContainerNode = {
+            type: 'macroContainer',
+            containerType: 'if',
+            branches,
+            start: macro.start,
+            end: macro.end,
+          };
+          if (stack.length > 0) {
+            const top = stack[stack.length - 1];
+            const currentBranch = top.container.branches[top.container.branches.length - 1];
+            currentBranch.children.push(container);
+          } else {
+            result.push(container);
+          }
+        } else if (macro.name === 'switch') {
+          // Split children by case/default branches BEFORE recursive processing
+          const branches = splitBranches(macro.children, 'switch');
+          // Recursively process each branch's children
+          for (const branch of branches) {
+            branch.children = pairMacros(branch.children);
+          }
+          const container: MacroContainerNode = {
+            type: 'macroContainer',
+            containerType: 'switch',
+            branches,
+            start: macro.start,
+            end: macro.end,
+          };
+          // Store switch condition separately
+          (container as any).switchCondition = macro.args;
+          if (stack.length > 0) {
+            const top = stack[stack.length - 1];
+            const currentBranch = top.container.branches[top.container.branches.length - 1];
+            currentBranch.children.push(container);
+          } else {
+            result.push(container);
+          }
+        } else {
+          // For while, for, widget - simple single-branch container
+          const containerType = macro.name === 'for' ? 'for' :
+                               macro.name === 'while' ? 'while' :
+                               macro.name === 'widget' ? 'widget' :
+                               'generic';
+          // Recursively process children
+          const processedChildren = pairMacros(macro.children);
+          const container: MacroContainerNode = {
+            type: 'macroContainer',
+            containerType: containerType,
+            branches: [{
+              type: 'macroBranch',
+              branchType: 'main',
+              condition: macro.args,
+              children: processedChildren,
+              start: macro.start,
+              end: macro.end,
+            }],
+            start: macro.start,
+            end: macro.end,
+          };
+          if (stack.length > 0) {
+            const top = stack[stack.length - 1];
+            const currentBranch = top.container.branches[top.container.branches.length - 1];
+            currentBranch.children.push(container);
+          } else {
+            result.push(container);
+          }
+        }
+      } else {
+        // Treat as self-contained macro - recursively process children
+        macro.children = pairMacros(macro.children);
+        if (stack.length > 0) {
+          const top = stack[stack.length - 1];
+          const currentBranch = top.container.branches[top.container.branches.length - 1];
+          currentBranch.children.push(macro);
+        } else {
+          result.push(macro);
+        }
+      }
+      continue; // Skip the rest of the loop for macros with children
     }
 
+    // Handle macros without children - use stack-based pairing
     // Handle if-elseif-else structures
     if (macro.name === 'if') {
       const container: MacroContainerNode = {
@@ -486,90 +593,6 @@ function pairMacros(nodes: PassageFlowNode[]): PassageFlowNode[] {
           const top = stack.splice(j, 1)[0];
           top.container.end = macro.end;
           break;
-        }
-      }
-    } else if (macro.children && macro.children.length > 0) {
-      // Macro has children - check if it should be a container
-      const shouldBeContainer = ['if', 'while', 'for', 'widget', 'switch'].includes(macro.name);
-      
-      if (shouldBeContainer) {
-        if (macro.name === 'if') {
-          // Split children by elseif/else branches
-          const branches = splitBranches(macro.children, 'if');
-          // Update the first branch to be 'if' type with the macro's condition
-          if (branches.length > 0) {
-            branches[0].branchType = 'if';
-            branches[0].condition = macro.args;
-          }
-          const container: MacroContainerNode = {
-            type: 'macroContainer',
-            containerType: 'if',
-            branches,
-            start: macro.start,
-            end: macro.end,
-          };
-          if (stack.length > 0) {
-            const top = stack[stack.length - 1];
-            const currentBranch = top.container.branches[top.container.branches.length - 1];
-            currentBranch.children.push(container);
-          } else {
-            result.push(container);
-          }
-        } else if (macro.name === 'switch') {
-          // Split children by case/default branches
-          const branches = splitBranches(macro.children, 'switch');
-          const container: MacroContainerNode = {
-            type: 'macroContainer',
-            containerType: 'switch',
-            branches,
-            start: macro.start,
-            end: macro.end,
-          };
-          // Store switch condition separately
-          (container as any).switchCondition = macro.args;
-          if (stack.length > 0) {
-            const top = stack[stack.length - 1];
-            const currentBranch = top.container.branches[top.container.branches.length - 1];
-            currentBranch.children.push(container);
-          } else {
-            result.push(container);
-          }
-        } else {
-          // For while, for, widget - simple single-branch container
-          const containerType = macro.name === 'for' ? 'for' :
-                               macro.name === 'while' ? 'while' :
-                               macro.name === 'widget' ? 'widget' :
-                               'generic';
-          const container: MacroContainerNode = {
-            type: 'macroContainer',
-            containerType: containerType,
-            branches: [{
-              type: 'macroBranch',
-              branchType: 'main',
-              condition: macro.args,
-              children: macro.children,
-              start: macro.start,
-              end: macro.end,
-            }],
-            start: macro.start,
-            end: macro.end,
-          };
-          if (stack.length > 0) {
-            const top = stack[stack.length - 1];
-            const currentBranch = top.container.branches[top.container.branches.length - 1];
-            currentBranch.children.push(container);
-          } else {
-            result.push(container);
-          }
-        }
-      } else {
-        // Treat as self-contained macro
-        if (stack.length > 0) {
-          const top = stack[stack.length - 1];
-          const currentBranch = top.container.branches[top.container.branches.length - 1];
-          currentBranch.children.push(macro);
-        } else {
-          result.push(macro);
         }
       }
     } else if (macro.closed === false && macro.error === 'REQ_CHILDREN_NOT_CLOSED') {
