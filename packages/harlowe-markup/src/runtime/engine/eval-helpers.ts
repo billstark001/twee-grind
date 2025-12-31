@@ -430,9 +430,11 @@ export function evaluateMatching(
   left: HarloweEngineVariable,
   right: HarloweEngineVariable
 ): boolean {
-  // Import advancedMatches dynamically to avoid circular dependency
-  const { advancedMatches } = require('./eval-matches')
-  const result = advancedMatches(left, right)
+  // Use lazy import to avoid circular dependency issues
+  // eval-matches depends on eval-helpers (for deepEqual)
+  // eval-helpers would depend on eval-matches (for advancedMatches)
+  const evalMatchesModule = require('./eval-matches')
+  const result = evalMatchesModule.advancedMatches(left, right)
   switch (operator) {
     case 'matches':
       return result
@@ -449,9 +451,9 @@ export function evaluateMatching(
  * @deprecated Use advancedMatches from eval-matches module instead
  */
 export function matches(value: HarloweEngineVariable, pattern: HarloweEngineVariable): boolean {
-  // Import advancedMatches dynamically to avoid circular dependency
-  const { advancedMatches } = require('./eval-matches')
-  return advancedMatches(value, pattern)
+  // Use lazy import to avoid circular dependency
+  const evalMatchesModule = require('./eval-matches')
+  return evalMatchesModule.advancedMatches(value, pattern)
 }
 
 /**

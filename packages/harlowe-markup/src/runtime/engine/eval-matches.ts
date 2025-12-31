@@ -203,8 +203,6 @@ export function isRegexDatatype(value: HarloweEngineVariable): value is RegexDat
   )
 }
 
-// Note: isDatatype is imported from '../std/datatype'
-
 // #endregion
 
 // #region Pattern Creation Helpers

@@ -67,5 +67,3 @@ export function invokeLambda(
 
   return result.value
 }
-
-// Note: isLambda is available from '../std/datatype' and should be imported from there if needed
