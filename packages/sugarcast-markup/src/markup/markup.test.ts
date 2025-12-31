@@ -276,13 +276,267 @@ Your health: <<print $health>>`;
       expect(textFlow).toBeDefined();
     });
 
+    test('parses underline text', () => {
+      const result = parse('This is __underline__ text');
+      expect(result.type).toBe('document');
+      const textFlow = result.children.find(n => n.type === 'textFlow') as TextFlowNode;
+      expect(textFlow).toBeDefined();
+    });
+
+    test('parses strikethrough text', () => {
+      const result = parse('This is ==strikethrough== text');
+      expect(result.type).toBe('document');
+      const textFlow = result.children.find(n => n.type === 'textFlow') as TextFlowNode;
+      expect(textFlow).toBeDefined();
+    });
+
+    test('parses superscript text', () => {
+      const result = parse('Super^^script^^');
+      expect(result.type).toBe('document');
+      const textFlow = result.children.find(n => n.type === 'textFlow') as TextFlowNode;
+      expect(textFlow).toBeDefined();
+    });
+
+    test('parses subscript text', () => {
+      const result = parse('Sub~~script~~');
+      expect(result.type).toBe('document');
+      const textFlow = result.children.find(n => n.type === 'textFlow') as TextFlowNode;
+      expect(textFlow).toBeDefined();
+    });
+
     test('parses code text', () => {
       const result = parse('This is {{{code}}} text');
       expect(result.type).toBe('document');
       const textFlow = result.children.find(n => n.type === 'textFlow') as TextFlowNode;
       expect(textFlow).toBeDefined();
     });
+
+    test('parses multiline code block', () => {
+      const result = parse('{{{ \n  $multiline + $code\n}}}');
+      expect(result.type).toBe('document');
+      expect(result.children.length).toBeGreaterThan(0);
+    });
   });
+
+  // #region Images
+  describe('Images', () => {
+    test('parses simple image', () => {
+      const result = parse('[img[home.png]]');
+      expect(result.type).toBe('document');
+      const imageNode = result.children.find(n => n.type === 'image');
+      expect(imageNode).toBeDefined();
+    });
+
+    test('parses image with variable source', () => {
+      const result = parse('[img[$src]]');
+      expect(result.type).toBe('document');
+      const imageNode = result.children.find(n => n.type === 'image');
+      expect(imageNode).toBeDefined();
+    });
+
+    test('parses image with link', () => {
+      const result = parse('[img[home.png][Home]]');
+      expect(result.type).toBe('document');
+      const imageNode = result.children.find(n => n.type === 'image');
+      expect(imageNode).toBeDefined();
+    });
+
+    test('parses image with alt text and link', () => {
+      const result = parse('[img[Go home|home.png][Home]]');
+      expect(result.type).toBe('document');
+      const imageNode = result.children.find(n => n.type === 'image');
+      expect(imageNode).toBeDefined();
+    });
+
+    test('parses image with setter', () => {
+      const result = parse('[img[home.png][Home][$done to true]]');
+      expect(result.type).toBe('document');
+      const imageNode = result.children.find(n => n.type === 'image');
+      expect(imageNode).toBeDefined();
+    });
+  });
+  // #endregion
+
+  // #region Links with advanced features
+  describe('Links with variables and setters', () => {
+    test('parses link with variable passage', () => {
+      const result = parse('[[$go]]');
+      expect(result.type).toBe('document');
+      const linkNode = result.children.find(n => n.type === 'link') as LinkNode;
+      expect(linkNode).toBeDefined();
+    });
+
+    test('parses link with setter', () => {
+      const result = parse('[[Grocery][$bought to "milk"]]');
+      expect(result.type).toBe('document');
+      const linkNode = result.children.find(n => n.type === 'link') as LinkNode;
+      expect(linkNode).toBeDefined();
+    });
+
+    test('parses link with display text and setter', () => {
+      const result = parse('[[Go buy milk|Grocery][$bought to "milk"]]');
+      expect(result.type).toBe('document');
+      const linkNode = result.children.find(n => n.type === 'link') as LinkNode;
+      expect(linkNode).toBeDefined();
+    });
+  });
+  // #endregion
+
+  // #region Variables with complex property access
+  describe('Complex variable access', () => {
+    test('parses variable with property access', () => {
+      const result = parse('$variable.property');
+      expect(result.type).toBe('document');
+      const varNode = result.children.find(n => n.type === 'variable');
+      expect(varNode).toBeDefined();
+    });
+
+    test('parses variable with bracket notation', () => {
+      const result = parse('$variable[1]');
+      expect(result.type).toBe('document');
+      const varNode = result.children.find(n => n.type === 'variable');
+      expect(varNode).toBeDefined();
+    });
+
+    test('parses variable with complex chaining', () => {
+      const result = parse('$v.w[1]["2"][\'3\'][$x]');
+      expect(result.type).toBe('document');
+      const varNode = result.children.find(n => n.type === 'variable');
+      expect(varNode).toBeDefined();
+    });
+
+    test('parses temporary variable', () => {
+      const result = parse('_tempVar');
+      expect(result.type).toBe('document');
+      const varNode = result.children.find(n => n.type === 'variable');
+      expect(varNode).toBeDefined();
+    });
+  });
+  // #endregion
+
+  // #region Line continuations
+  describe('Line continuations', () => {
+    test('handles line continuation with backslash', () => {
+      const result = parse('The rain in Spain falls \\\nmainly on the plain.');
+      expect(result.type).toBe('document');
+      expect(result.children.length).toBeGreaterThan(0);
+    });
+
+    test('handles line continuation with trailing spaces', () => {
+      const result = parse('The rain in Spain falls \\    \nmainly on the plain.');
+      expect(result.type).toBe('document');
+      expect(result.children.length).toBeGreaterThan(0);
+    });
+  });
+  // #endregion
+
+  // #region Lists, quotes, and other block elements
+  describe('Lists', () => {
+    test('parses unordered list', () => {
+      const result = parse('* A list item\n* Another list item');
+      expect(result.type).toBe('document');
+      expect(result.children.length).toBeGreaterThan(0);
+    });
+
+    test('parses ordered list', () => {
+      const result = parse('# A list item\n# Another list item');
+      expect(result.type).toBe('document');
+      expect(result.children.length).toBeGreaterThan(0);
+    });
+
+    test('parses nested lists', () => {
+      const result = parse('* A list item\n** Nested item');
+      expect(result.type).toBe('document');
+      expect(result.children.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Quotes', () => {
+    test('parses quotes by line', () => {
+      const result = parse('>Line 1\n>Line 2');
+      expect(result.type).toBe('document');
+      expect(result.children.length).toBeGreaterThan(0);
+    });
+
+    test('parses nested quotes', () => {
+      const result = parse('>Line 1\n>>Nested');
+      expect(result.type).toBe('document');
+      expect(result.children.length).toBeGreaterThan(0);
+    });
+
+    test('parses block quotes', () => {
+      const result = parse('<<<\n Line 1\n Line 2\n<<<');
+      expect(result.type).toBe('document');
+      expect(result.children.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Other block elements', () => {
+    test('parses horizontal rule', () => {
+      const result = parse('----');
+      expect(result.type).toBe('document');
+      expect(result.children.length).toBeGreaterThan(0);
+    });
+
+    test('parses longer horizontal rule', () => {
+      const result = parse('------------');
+      expect(result.type).toBe('document');
+      expect(result.children.length).toBeGreaterThan(0);
+    });
+
+    test('parses verbatim text with triple quotes', () => {
+      const result = parse('"""No //format//"""');
+      expect(result.type).toBe('document');
+      expect(result.children.length).toBeGreaterThan(0);
+    });
+
+    test('parses nowiki tag', () => {
+      const result = parse('<nowiki>No //format//</nowiki>');
+      expect(result.type).toBe('document');
+      expect(result.children.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Styles', () => {
+    test('parses inline styles with ID and class', () => {
+      const result = parse('@@#alfa;.bravo;Text@@');
+      expect(result.type).toBe('document');
+      expect(result.children.length).toBeGreaterThan(0);
+    });
+
+    test('parses inline styles with CSS', () => {
+      const result = parse('@@color:red;Text@@');
+      expect(result.type).toBe('document');
+      expect(result.children.length).toBeGreaterThan(0);
+    });
+
+    test('parses block styles', () => {
+      const result = parse('@@color:red;\nText\n@@');
+      expect(result.type).toBe('document');
+      expect(result.children.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Comments', () => {
+    test('parses C-style block comment', () => {
+      const result = parse('/* This is a comment. */');
+      expect(result.type).toBe('document');
+      expect(result.children.length).toBeGreaterThan(0);
+    });
+
+    test('parses TiddlyWiki-style comment', () => {
+      const result = parse('/% This is a comment. %/');
+      expect(result.type).toBe('document');
+      expect(result.children.length).toBeGreaterThan(0);
+    });
+
+    test('parses HTML comment', () => {
+      const result = parse('<!-- This is a comment. -->');
+      expect(result.type).toBe('document');
+      expect(result.children.length).toBeGreaterThan(0);
+    });
+  });
+  // #endregion
 
   describe('Edge cases', () => {
     test('handles empty string', () => {
