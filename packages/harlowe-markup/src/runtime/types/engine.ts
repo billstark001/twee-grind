@@ -100,12 +100,10 @@ export interface PassageFlowRenderer<TChangerArgs = any, TCursor = any> {
   pushText(text: string): void
   pushTextElement(element: string): void // br, hr, etc.
   pushLink(text: string, passage: string): void
+  pushHtmlTag(tag: string, rawContent: string): void
 
-  enterHook(hookName: string): TCursor
+  enterHook(hookName?: string): TCursor
   exitHook(): void
-
-  enterTag(name: string, attrs: Record<string, string>, children?: string): void
-  exitTag(name: string): void
 
   enterChanger(name: string, args?: TChangerArgs): void
   exitChanger(name: string): void

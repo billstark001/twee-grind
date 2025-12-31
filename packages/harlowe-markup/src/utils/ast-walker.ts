@@ -20,14 +20,22 @@ export type ASTVisitor = (event: ASTWalkEvent) => void | boolean
 /**
  * Serialized state of an AST walker
  */
-export interface WalkerState {
-  stack: Array<{
-    node: HarloweASTNode
-    parent?: HarloweASTNode
-    index?: number
-    phase: 'enter' | 'children' | 'exit'
-    childIndex: number
-  }>
+
+export interface ASTWalkerFrame {
+  node: HarloweASTNode
+  parent?: HarloweASTNode
+  index?: number
+  phase: 'enter' | 'children' | 'exit'
+  childIndex: number
+}
+
+export interface ASTWalkerState {
+  stack: ASTWalkerFrame[]
+}
+
+export interface ASTWalkerOptions {
+  initialState?: ASTWalkerState
+  skipNodeTypes?: Iterable<string> | ReadonlySet<string>
 }
 
 /**
@@ -35,25 +43,18 @@ export interface WalkerState {
  */
 export class ASTWalker {
   private visitor: ASTVisitor
-  private stack: Array<{
-    node: HarloweASTNode
-    parent?: HarloweASTNode
-    index?: number
-    phase: 'enter' | 'children' | 'exit'
-    childIndex: number
-  }> = []
+  private stack: ASTWalkerFrame[] = []
   private completed = false
-  private skipNodeTypes: Set<string>
+  private skipNodeTypes: ReadonlySet<string>
 
   constructor(
     visitor: ASTVisitor,
-    options?: {
-      initialState?: WalkerState
-      skipNodeTypes?: string[]
-    }
+    options?: ASTWalkerOptions
   ) {
     this.visitor = visitor
-    this.skipNodeTypes = new Set(options?.skipNodeTypes ?? [])
+    this.skipNodeTypes = options?.skipNodeTypes instanceof Set
+      ? options.skipNodeTypes
+      : new Set(options?.skipNodeTypes ?? [])
     if (options?.initialState) {
       this.stack = options.initialState.stack
     }
@@ -178,7 +179,7 @@ export class ASTWalker {
   /**
    * Serialize the current walker state
    */
-  serialize(): WalkerState {
+  serialize(): ASTWalkerState {
     return {
       stack: this.stack.map(frame => ({ ...frame })),
     }
