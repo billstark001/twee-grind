@@ -430,7 +430,11 @@ export function evaluateMatching(
   left: HarloweEngineVariable,
   right: HarloweEngineVariable
 ): boolean {
-  const result = matches(left, right)
+  // Use lazy import to avoid circular dependency issues
+  // eval-matches depends on eval-helpers (for deepEqual)
+  // eval-helpers would depend on eval-matches (for advancedMatches)
+  const evalMatchesModule = require('./eval-matches')
+  const result = evalMatchesModule.advancedMatches(left, right)
   switch (operator) {
     case 'matches':
       return result
@@ -444,21 +448,12 @@ export function evaluateMatching(
 /**
  * Check if value matches pattern
  * Pattern can be a regex, datatype, or value
+ * @deprecated Use advancedMatches from eval-matches module instead
  */
 export function matches(value: HarloweEngineVariable, pattern: HarloweEngineVariable): boolean {
-  // Regex matching
-  if (pattern instanceof RegExp) {
-    return pattern.test(String(value))
-  }
-
-  // Datatype keyword matching
-  if (typeof pattern === 'string') {
-    const keyword = pattern.toLowerCase() as DatatypeKeyword
-    return matchesDatatype(value, keyword)
-  }
-
-  // Equality fallback
-  return deepEqual(value, pattern)
+  // Use lazy import to avoid circular dependency
+  const evalMatchesModule = require('./eval-matches')
+  return evalMatchesModule.advancedMatches(value, pattern)
 }
 
 /**

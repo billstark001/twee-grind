@@ -38,6 +38,21 @@ export interface HookNameEvaluator {
 }
 
 /**
+ * External dependency for lambda evaluation
+ * Enables lambda invocation from eval context
+ */
+export interface LambdaEvaluator {
+  /**
+   * Invoke a lambda function
+   * @param lambda Lambda variable
+   * @param args Arguments to pass to lambda
+   * @param context Evaluation context
+   * @returns Result of lambda invocation
+   */
+  invokeLambda(lambda: HarloweEngineVariable, args: HarloweEngineVariable[], context: EvaluationContext): HarloweEngineVariable
+}
+
+/**
  * Reserved value injections for expression evaluation
  */
 export type ReservedValues = {
@@ -59,6 +74,7 @@ export interface EvaluationContext {
   reserved: ReservedValues
   resolver: VariableResolver
   hookNameEvaluator: HookNameEvaluator
+  lambdaEvaluator?: LambdaEvaluator
 }
 
 

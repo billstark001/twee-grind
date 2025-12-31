@@ -224,6 +224,10 @@ export type ErrorVariable = {
 export type DatatypeVariable = {
   [HarloweCustomDataType]: 'Datatype',
   datatype: DatatypeKeyword,
+  // Extended support for pattern matching
+  patternType?: 'array' | 'datamap' | 'dataset' | 'regex'
+  pattern?: any
+  regex?: RegExp
 }
 
 type VariableMetadata = {
@@ -292,8 +296,12 @@ export type CustomMacroVariable = FunctionalVariable & {
 
 export type LambdaVariable = FunctionalVariable & {
   [HarloweCustomDataType]: 'Lambda',
+  // Lambda type: where/when = filter, via = transform, making = accumulator, each = iterator
+  lambdaType?: 'where' | 'when' | 'via' | 'making' | 'each'
   argNames: string[],
   body: ExpressionNode,
+  // For 'making' lambdas: the making variable name
+  makingVarName?: string
 }
 
 export type CommandVariable = FunctionalVariable & {
@@ -302,4 +310,5 @@ export type CommandVariable = FunctionalVariable & {
   data?: JsonSerializable,
 }
 
+// #endregion
 // #endregion

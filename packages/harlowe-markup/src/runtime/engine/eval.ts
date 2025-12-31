@@ -465,6 +465,15 @@ function evaluateUnaryOperatorSync(
       }
       return propertyValue
     }
+    
+    case 'where':
+    case 'when':
+      // Prefix where/when: creates a lambda with the operand as body
+      return createPrefixLambda(operator as 'where' | 'when', operand)
+    
+    case 'each':
+      // each _varName: creates an iterator lambda
+      return createEachLambda(operand)
 
     default:
       throw new Error(`Unknown unary operator: ${operator}`)
@@ -558,11 +567,20 @@ function evaluateBinaryOperatorSync(
     case 'via':
     case 'where':
     case 'when':
+      // Lambda operators: create lambda with the operator type
+      return createLambdaFromOperator(operator as 'via' | 'where' | 'when', left, right)
+      
     case 'making':
+      // Making lambda: requires special handling for the making variable
+      return createMakingLambda(left, right)
+      
     case 'each':
+      // Each is a prefix operator, shouldn't be here as binary
+      throw new Error(`'each' operator must be used as prefix, not infix`)
+    
     case 'bind':
-      // These are special contextual operators handled by specific macros
-      throw new Error(`Contextual operator '${operator}' requires macro context`)
+      // Bind creates a special bind variable
+      throw new Error(`'bind' operator requires macro context`)
 
     case 'typeSignature':
       // Type signature operator - creates typed variable
@@ -572,6 +590,143 @@ function evaluateBinaryOperatorSync(
     default:
       throw new Error(`Unknown binary operator: ${operator}`)
   }
+}
+
+// #endregion
+
+// #region Lambda Creation Helpers
+
+/**
+ * Create a lambda from where/when/via operators
+ * These operators can chain: (_x where _x > 5 via _x * 2)
+ */
+function createLambdaFromOperator(
+  lambdaType: 'where' | 'when' | 'via',
+  left: HarloweEngineVariable,
+  right: HarloweEngineVariable
+): HarloweEngineVariable {
+  const { HarloweCustomDataType, HarloweScope } = require('../types')
+  
+  // If left is already a lambda, chain them
+  if (typeof left === 'object' && left !== null && 
+      left[HarloweCustomDataType] === 'Lambda') {
+    const existingLambda = left as any
+    // Create a chained lambda that applies both
+    return {
+      [HarloweCustomDataType]: 'Lambda',
+      [HarloweScope]: existingLambda[HarloweScope],
+      lambdaType,
+      argNames: existingLambda.argNames,
+      body: right as any, // The right side becomes the new body
+      // Store the previous lambda for chaining
+      chainedFrom: existingLambda
+    }
+  }
+  
+  // If left is a variable, use it as the loop variable name
+  if (typeof left === 'object' && left !== null && left['type'] === 'variable') {
+    const varNode = left as any
+    return {
+      [HarloweCustomDataType]: 'Lambda',
+      [HarloweScope]: null, // Will be set when used
+      lambdaType,
+      argNames: [varNode.name],
+      body: right as any
+    }
+  }
+  
+  // Otherwise, use 'it' as default loop variable
+  return {
+    [HarloweCustomDataType]: 'Lambda',
+    [HarloweScope]: null,
+    lambdaType,
+    argNames: ['it'],
+    body: right as any
+  }
+}
+
+/**
+ * Create a making lambda (accumulator pattern)
+ * Example: _num making _total via _total + _num
+ */
+function createMakingLambda(
+  left: HarloweEngineVariable,
+  right: HarloweEngineVariable
+): HarloweEngineVariable {
+  const { HarloweCustomDataType, HarloweScope } = require('../types')
+  
+  // Right must be a variable (the making variable)
+  if (typeof right === 'object' && right !== null && right['type'] === 'variable') {
+    const makingVarNode = right as any
+    
+    // If left is a lambda (e.g., from via), combine them
+    if (typeof left === 'object' && left !== null && 
+        left[HarloweCustomDataType] === 'Lambda') {
+      const existingLambda = left as any
+      return {
+        ...existingLambda,
+        lambdaType: 'making',
+        makingVarName: makingVarNode.name
+      }
+    }
+    
+    // If left is a variable, use it as the loop variable
+    if (typeof left === 'object' && left !== null && left['type'] === 'variable') {
+      const varNode = left as any
+      return {
+        [HarloweCustomDataType]: 'Lambda',
+        [HarloweScope]: null,
+        lambdaType: 'making',
+        argNames: [varNode.name],
+        makingVarName: makingVarNode.name,
+        body: null // Making lambda needs a via to have a body
+      }
+    }
+  }
+  
+  throw new Error('Invalid making lambda syntax: right side must be a variable')
+}
+
+/**
+ * Create a lambda from prefix where/when operators
+ * Example: where _x > 5
+ */
+function createPrefixLambda(
+  lambdaType: 'where' | 'when',
+  operand: HarloweEngineVariable
+): HarloweEngineVariable {
+  const { HarloweCustomDataType, HarloweScope } = require('../types')
+  
+  // Use 'it' as the default loop variable for prefix form
+  return {
+    [HarloweCustomDataType]: 'Lambda',
+    [HarloweScope]: null,
+    lambdaType,
+    argNames: ['it'],
+    body: operand as any
+  }
+}
+
+/**
+ * Create an each lambda (iterator)
+ * Example: each _item
+ */
+function createEachLambda(operand: HarloweEngineVariable): HarloweEngineVariable {
+  const { HarloweCustomDataType, HarloweScope } = require('../types')
+  
+  // Operand should be a variable node
+  if (typeof operand === 'object' && operand !== null && operand['type'] === 'variable') {
+    const varNode = operand as any
+    return {
+      [HarloweCustomDataType]: 'Lambda',
+      [HarloweScope]: null,
+      lambdaType: 'each',
+      argNames: [varNode.name],
+      body: null // each lambdas don't have a body expression
+    }
+  }
+  
+  throw new Error('each operator requires a variable name')
 }
 
 // #endregion
