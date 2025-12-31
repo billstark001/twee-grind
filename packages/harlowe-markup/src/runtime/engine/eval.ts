@@ -194,6 +194,7 @@ export function stepEvaluation(
             // No args, call macro immediately
             frame.macroPhase = 'call'
             frame.argsValues = []
+            frame.phase = 'evaluating'
             return stepEvaluation(state, context)
           } else {
             // Need to evaluate arguments
@@ -406,7 +407,7 @@ function evaluateLiteral(node: LiteralNode): HarloweEngineVariable {
     case 'string':
       return String(node.value)
     case 'boolean':
-      return Boolean(node.value.toLowerCase())
+      return node.value.toLowerCase() === 'true'
     case 'colour':
       return allPredefinedColors[node.value.toLowerCase() as any as PredefinedColorName]
     case 'datatype':
