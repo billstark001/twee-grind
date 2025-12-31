@@ -31,12 +31,6 @@ describe('Eval Module', () => {
       },
     }
 
-    const macroEvaluator: MacroEvaluator = {
-      evaluateMacro: async (macro, scope) => {
-        throw new Error('Macro evaluation not implemented in test')
-      },
-    }
-
     const hookNameEvaluator: HookNameEvaluator = {
       evaluateHookName: (node, scope) => {
         return {
@@ -55,7 +49,6 @@ describe('Eval Module', () => {
       scope,
       reserved: {},
       resolver,
-      macroEvaluator,
       hookNameEvaluator,
     }
   }
@@ -646,11 +639,11 @@ describe('Eval Module', () => {
 
       expect(step.type).toBe('needMacro')
 
-      // Resume with macro result
-      const resumedState = resumeEvaluation(state, 'macro result')
+      // Resume with macro result (modifies state in-place)
+      resumeEvaluation(state, 'macro result')
 
-      expect(resumedState.done).toBe(true)
-      expect(resumedState.result).toBe('macro result')
+      expect(state.done).toBe(true)
+      expect(state.result).toBe('macro result')
     })
 
     it('should throw error when resuming completed evaluation', () => {

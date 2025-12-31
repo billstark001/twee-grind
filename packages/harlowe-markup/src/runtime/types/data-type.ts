@@ -18,6 +18,7 @@ export type HarloweEngineVariable =
   | ColorVariable
   | GradientVariable
 
+  | ErrorVariable
   | BindVariable
   | DatatypeVariable
   | TypedVarVariable
@@ -32,6 +33,7 @@ export const allHarloweDataTypes = Object.freeze([
   // Special types
   'Any',
   'Const',
+  'Error',
 
   // JavaScript primitive types
   'Array',
@@ -212,6 +214,12 @@ export type GradientVariable = {
 // #endregion
 
 // #region Technical types
+
+export type ErrorVariable = {
+  [HarloweCustomDataType]: 'Error',
+  message: string,
+  [key: string]: any,
+}
 
 export type DatatypeVariable = {
   [HarloweCustomDataType]: 'Datatype',

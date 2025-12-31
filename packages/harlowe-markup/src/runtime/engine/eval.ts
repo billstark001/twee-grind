@@ -9,20 +9,16 @@ import type {
   BinaryOperatorNode,
   MacroMetadata,
 } from '../../markup/types'
-import { type HarloweEngineVariable, type HarloweEngineScope, HarloweCustomDataType, PredefinedColorName, HookNameVariable, EvaluationContext } from '../types'
+import { type HarloweEngineVariable, HarloweCustomDataType, PredefinedColorName, HookNameVariable, EvaluationContext } from '../types'
 import { allPredefinedColors } from '../std/colour'
 import {
   accessProperty,
   evaluateArithmetic,
   evaluateComparison,
-  deepEqual,
   evaluateLogical,
   evaluateMembership,
-  contains,
   evaluateMatching,
-  matches,
   evaluateTypeCheck,
-  isOfType,
 } from './eval-helpers'
 
 // #region Types and Interfaces
@@ -89,11 +85,12 @@ export function createEvaluationState(node: ExpressionNode): EvaluationState {
 
 /**
  * Resume evaluation with a macro result
+ * Modifies the state in-place
  */
 export function resumeEvaluation(
   state: EvaluationState,
   macroResult: HarloweEngineVariable
-): EvaluationState {
+): void {
   if (state.done) {
     throw new Error('Cannot resume completed evaluation')
   }
@@ -106,18 +103,17 @@ export function resumeEvaluation(
   // Set the macro result as the frame's result
   topFrame.phase = 'complete'
 
-  // Pop the frame and set result
-  const newStack = state.stack.slice(0, -1)
+  // Pop the frame (in-place modification)
+  state.stack.pop()
 
-  if (newStack.length === 0) {
-    return {
-      stack: [],
-      done: true,
-      result: macroResult,
-    }
+  if (state.stack.length === 0) {
+    // Evaluation complete
+    state.done = true
+    state.result = macroResult
+    return
   }
 
-  const parentFrame = newStack[newStack.length - 1]
+  const parentFrame = state.stack[state.stack.length - 1]
 
   // Update parent frame with the result
   if (parentFrame.binaryPhase === 'left') {
@@ -138,11 +134,6 @@ export function resumeEvaluation(
     } else {
       parentFrame.macroPhase = 'call'
     }
-  }
-
-  return {
-    ...state,
-    stack: newStack,
   }
 }
 

@@ -72,6 +72,9 @@ export interface EvaluationContext {
   scope: HarloweEngineScope
   reserved: ReservedValues
   resolver: VariableResolver
-  macroEvaluator: MacroEvaluator
   hookNameEvaluator: HookNameEvaluator
+}
+
+export interface ExecutionContext extends EvaluationContext {
+  macroEvaluator: MacroEvaluator
 }
