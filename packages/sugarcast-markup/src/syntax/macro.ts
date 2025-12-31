@@ -336,7 +336,7 @@ export const generateMacroSyntax = (config?: MacroParserConfigCollection): Synta
 
       // parse arguments
 
-      const argIndex = w.matchGroup.index + w.matchGroup.length;
+      const argIndex = w.matchGroup.index + w.matchGroup[0].length;
       let macroOpenerEnd = -1;
       const nodeArgs: Record<string, unknown> = { name, isClose };
       try {
