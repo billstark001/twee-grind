@@ -25,3 +25,13 @@ export { Patterns } from './patterns';
 export * from './expression/index';
 
 export * as enumUtil from './util/enum';
+
+// Export AST types
+export * from './types';
+
+// Export complete markup parser
+export {
+  MarkupParser,
+  parse,
+  type MarkupParserOptions,
+} from './markup';
